@@ -1,0 +1,513 @@
+package com.example.focusme.presentation.screen.focus
+
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Alarm
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.focusme.R
+import com.example.focusme.notification.NotificationHelper
+import com.example.focusme.presentation.ui.components.PrimaryButton
+import com.example.focusme.presentation.ui.components.SoftCard
+import com.example.focusme.presentation.ui.theme.PinkPrimary
+import com.example.focusme.presentation.ui.theme.TextDark
+import com.example.focusme.presentation.ui.theme.TextGray
+import com.example.focusme.reminder.ReminderScheduler
+
+@Composable
+fun FocusScreen(vm: FocusViewModel = viewModel()) {
+    val state by vm.uiState.collectAsState()
+    val context = LocalContext.current
+    LaunchedEffect(state.alarmTrigger) {
+        if (state.alarmTrigger != 0L) {
+            NotificationHelper.showTimerFinished(context)
+            val mp = android.media.MediaPlayer.create(context, R.raw.alarm_sound)
+            mp.setOnCompletionListener { it.release() }
+            mp.start()
+        }
+    }
+
+
+    if (state.showSummary) {
+        SessionSummaryScreen(
+            sessionSeconds = state.sessionSeconds,
+            tasks = state.tasksCount,
+            xp = state.xpPoints,
+            onIgnore = vm::closeSummaryAndReset,
+            onSave = { title, focusRate, satisfactionRate, visibility, allowComments ->
+                vm.onSaveClick(
+                    context = context,
+                    title = title,
+                    focusRate = focusRate,
+                    satisfactionRate = satisfactionRate,
+                    visibility = visibility,
+                    allowComments = allowComments
+                )
+            }
+        )
+        return
+    }
+
+
+    // 🔔 notif + 🔊 son
+    LaunchedEffect(state.alarmTrigger) {
+        if (state.alarmTrigger != 0L) {
+            NotificationHelper.showTimerFinished(context)
+            val mp = android.media.MediaPlayer.create(context, R.raw.alarm_sound)
+            mp.setOnCompletionListener { it.release() }
+            mp.start()
+        }
+    }
+
+    val sessionActive = state.startedAtMillis != null
+    val isPaused = sessionActive && !state.isRunning
+
+    Box(modifier = Modifier.fillMaxSize()) {
+
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 18.dp, vertical = 14.dp)
+        ) {
+
+            // TOP BAR
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Image(
+                    painter = painterResource(id = R.drawable.ic_focusme_logo),
+                    contentDescription = "FocusMe",
+                    modifier = Modifier.size(44.dp)
+                )
+
+                Spacer(Modifier.width(12.dp))
+
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        "FocusMe",
+                        color = TextDark,
+                        fontWeight = FontWeight.ExtraBold,
+                        style = MaterialTheme.typography.headlineSmall
+                    )
+                    Text(
+                        "Minuteur",
+                        color = TextGray,
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                }
+
+                IconButton(onClick = { ReminderScheduler.scheduleInMinutes(context, 1) }) {
+                    Icon(
+                        imageVector = Icons.Default.Alarm,
+                        contentDescription = "Reminder",
+                        tint = PinkPrimary
+                    )
+                }
+            }
+
+            Spacer(Modifier.height(18.dp))
+
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+
+                TimerCircle(
+                    remainingSeconds = state.remainingSeconds,
+                    highlightRing = sessionActive,
+                    isPaused = isPaused,
+                    onClickSetTime = vm::openSetTimeDialog
+                )
+
+                Spacer(Modifier.height(10.dp))
+
+                // -5/+5 seulement quand session a commencé
+                if (sessionActive) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 20.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            "-5 min",
+                            color = PinkPrimary,
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.clickable { vm.addMinutes(-5) }
+                        )
+                        Text(
+                            "+5 min",
+                            color = PinkPrimary,
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.clickable { vm.addMinutes(+5) }
+                        )
+                    }
+                    Spacer(Modifier.height(14.dp))
+                } else {
+                    Spacer(Modifier.height(14.dp))
+                }
+
+                if (state.showQuickButtons) {
+                    Text(
+                        text = "Démarrage rapide",
+                        color = TextGray,
+                        fontWeight = FontWeight.Medium,
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 10.dp),
+                        textAlign = TextAlign.Center
+                    )
+
+                    QuickStartRow(
+                        on15 = { vm.setMinutesQuick(15) },
+                        on25 = { vm.setMinutesQuick(25) },
+                        on45 = { vm.setMinutesQuick(45) }
+                    )
+                } else {
+                    when {
+                        state.isRunning -> {
+                            RunningControls(
+                                onPause = vm::pauseTimer,
+                                onStop = vm::askStop
+                            )
+                        }
+
+                        isPaused -> {
+                            PausedControls(
+                                onResume = vm::resumeTimer,
+                                onStop = vm::askStop
+                            )
+                        }
+
+                        else -> {
+                            PrimaryButton(
+                                text = "▶ Démarrer",
+                                onClick = vm::startTimer,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.weight(1f))
+
+            SoftCard(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { }
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier
+                            .size(52.dp)
+                            .clip(CircleShape)
+                            .background(PinkPrimary.copy(alpha = 0.14f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            "+",
+                            color = PinkPrimary,
+                            style = MaterialTheme.typography.headlineMedium,
+                            fontWeight = FontWeight.Black
+                        )
+                    }
+
+                    Spacer(Modifier.width(14.dp))
+
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            "Ajouter des tâches à la session",
+                            color = TextDark,
+                            fontWeight = FontWeight.SemiBold,
+                            style = MaterialTheme.typography.titleMedium
+                        )
+                        Text(
+                            "Indique ce que tu étudieras",
+                            color = TextGray,
+                            style = MaterialTheme.typography.bodyLarge
+                        )
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(10.dp))
+        }
+
+        // OVERLAYS
+        if (state.showSetTimeDialog) {
+            SetTimeDialog(
+                minutes = state.tempMinutes,
+                onMinus = vm::decTempMinutes,
+                onPlus = vm::incTempMinutes,
+                onCancel = vm::closeSetTimeDialog,
+                onConfirm = vm::confirmMinutes
+            )
+        }
+
+        if (state.showStopDialog) {
+            StopConfirmDialog(
+                studiedMinutes = studiedMinutes(state.startedAtMillis),
+                onContinue = vm::cancelStop,
+                onStop = vm::confirmStop
+            )
+        }
+    }
+}
+
+
+/* ---------------------------
+   QUICK START
+   --------------------------- */
+
+@Composable
+private fun QuickStartRow(
+    on15: () -> Unit,
+    on25: () -> Unit,
+    on45: () -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        QuickCard("15\nmin", preselected = false, modifier = Modifier.weight(1f), onClick = on15)
+        QuickCard("25\nmin", preselected = true, modifier = Modifier.weight(1f), onClick = on25)
+        QuickCard("45\nmin", preselected = false, modifier = Modifier.weight(1f), onClick = on45)
+    }
+}
+
+@Composable
+private fun QuickCard(
+    label: String,
+    preselected: Boolean,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+    val bg = if (preselected) PinkPrimary else MaterialTheme.colorScheme.surface
+    val textColor = if (preselected) Color.White else TextDark
+
+    Box(
+        modifier = modifier
+            .height(82.dp)
+            .clip(RoundedCornerShape(16.dp))
+            .background(bg)
+            .clickable { onClick() }
+            .padding(vertical = 12.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            label,
+            color = textColor,
+            fontWeight = FontWeight.Bold,
+            style = MaterialTheme.typography.titleMedium,
+            textAlign = TextAlign.Center
+        )
+    }
+}
+
+/* ---------------------------
+   TIMER CIRCLE
+   --------------------------- */
+
+@Composable
+private fun TimerCircle(
+    remainingSeconds: Int,
+    highlightRing: Boolean,
+    isPaused: Boolean,
+    onClickSetTime: () -> Unit
+) {
+    val mm = remainingSeconds / 60
+    val ss = remainingSeconds % 60
+    val timeText = "%02d:%02d".format(mm, ss)
+
+    Box(
+        modifier = Modifier
+            .size(305.dp)
+            .clip(CircleShape)
+            .background(if (highlightRing) PinkPrimary else PinkPrimary.copy(alpha = 0.12f)),
+        contentAlignment = Alignment.Center
+    ) {
+        Box(
+            modifier = Modifier
+                .size(270.dp)
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.surface)
+                .clickable { onClickSetTime() },
+            contentAlignment = Alignment.Center
+        ) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(
+                    timeText,
+                    style = MaterialTheme.typography.displayLarge,
+                    color = if (isPaused) PinkPrimary.copy(alpha = 0.55f) else TextDark,
+                    fontWeight = FontWeight.ExtraBold
+                )
+                Spacer(Modifier.height(8.dp))
+
+                if (isPaused) {
+                    Text("⏸ PAUSE", color = PinkPrimary, fontWeight = FontWeight.Bold)
+                } else {
+                    Text(
+                        "Appuie pour définir l'heure",
+                        color = TextGray,
+                        style = MaterialTheme.typography.bodyLarge
+                    )
+                }
+            }
+        }
+    }
+}
+
+/* ---------------------------
+   CONTROLS
+   --------------------------- */
+
+@Composable
+private fun RunningControls(
+    onPause: () -> Unit,
+    onStop: () -> Unit
+) {
+    Row(
+        Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        PrimaryButton(text = "⏸ Pause", onClick = onPause, modifier = Modifier.weight(1f))
+        DangerButton(text = "⏹ Arrêter", onClick = onStop, modifier = Modifier.weight(1f))
+    }
+}
+
+@Composable
+private fun PausedControls(
+    onResume: () -> Unit,
+    onStop: () -> Unit
+) {
+    Row(
+        Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        PrimaryButton(text = "▶ Reprendre", onClick = onResume, modifier = Modifier.weight(1f))
+        DangerButton(text = "⏹ Arrêter", onClick = onStop, modifier = Modifier.weight(1f))
+    }
+}
+
+@Composable
+private fun DangerButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    Box(
+        modifier = modifier
+            .height(52.dp)
+            .clip(RoundedCornerShape(16.dp))
+            .background(Color(0xFFE53935))
+            .clickable { onClick() },
+        contentAlignment = Alignment.Center
+    ) {
+        Text(text, color = Color.White, fontWeight = FontWeight.Bold)
+    }
+}
+
+/* ---------------------------
+   STOP DIALOG helpers
+   --------------------------- */
+
+private fun studiedMinutes(startedAtMillis: Long?): Int {
+    if (startedAtMillis == null) return 0
+    val diff = System.currentTimeMillis() - startedAtMillis
+    return (diff / 60000L).toInt().coerceAtLeast(0)
+}
+@Composable
+private fun StopConfirmDialog(
+    studiedMinutes: Int,
+    onContinue: () -> Unit,
+    onStop: () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black.copy(alpha = 0.35f)),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            modifier = Modifier
+                .padding(18.dp)
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(22.dp))
+                .background(MaterialTheme.colorScheme.surface)
+                .padding(18.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(44.dp)
+                    .clip(CircleShape)
+                    .background(Color(0xFFFFEBEE)),
+                contentAlignment = Alignment.Center
+            ) {
+                Text("⏹", color = Color(0xFFE53935), fontWeight = FontWeight.Black)
+            }
+
+            Spacer(Modifier.height(10.dp))
+
+            Text("Arrêter la session ?", color = TextDark, fontWeight = FontWeight.ExtraBold)
+
+            Spacer(Modifier.height(6.dp))
+
+            Text(
+                "Tu étudies depuis $studiedMinutes min",
+                color = PinkPrimary,
+                fontWeight = FontWeight.Bold
+            )
+
+            Spacer(Modifier.height(4.dp))
+
+            Text("Tes progrès seront enregistrés", color = TextGray)
+
+            Spacer(Modifier.height(14.dp))
+
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                OutlineButton("Continuer", onContinue, modifier = Modifier.weight(1f))
+                DangerButton("Arrêter", onStop, modifier = Modifier.weight(1f))
+            }
+        }
+    }
+}
+
+@Composable
+private fun OutlineButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    Box(
+        modifier = modifier
+            .height(52.dp)
+            .clip(RoundedCornerShape(16.dp))
+            .background(MaterialTheme.colorScheme.surface)
+            .clickable { onClick() },
+        contentAlignment = Alignment.Center
+    ) {
+        Text(text, color = PinkPrimary, fontWeight = FontWeight.Bold)
+    }
+}
+
