@@ -18,7 +18,6 @@ object ReminderScheduler {
     private const val CHANNEL_NAME = "Focus Reminder"
 
     fun createChannel(context: Context) {
-        // ✅ NotificationChannel existe seulement à partir de API 26
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
 
         val manager = context.getSystemService<NotificationManager>() ?: return

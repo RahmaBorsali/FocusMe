@@ -22,5 +22,4 @@ interface FriendsDao {
     suspend fun deleteById(id: Int)
 
 
-
 }

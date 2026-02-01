@@ -33,7 +33,6 @@ import androidx.compose.material.icons.filled.Headphones
 class MainActivity : ComponentActivity() {
     private val requestNotifPermission =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-            // tu peux afficher un toast si tu veux
         }
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)

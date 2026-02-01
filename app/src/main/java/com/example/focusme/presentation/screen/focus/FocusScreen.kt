@@ -19,12 +19,14 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.focusme.R
 import com.example.focusme.notification.NotificationHelper
@@ -34,9 +36,23 @@ import com.example.focusme.presentation.ui.theme.PinkPrimary
 import com.example.focusme.presentation.ui.theme.TextDark
 import com.example.focusme.presentation.ui.theme.TextGray
 import com.example.focusme.reminder.ReminderScheduler
+import androidx.compose.material.icons.filled.CalendarMonth
+import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material3.Surface
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.graphics.vector.ImageVector
+import com.example.focusme.presentation.ui.theme.AppBg
+import androidx.compose.material.icons.outlined.AccessTime
+import androidx.compose.material.icons.outlined.Coffee
+import androidx.compose.material.icons.outlined.Timer
+import androidx.compose.material.icons.outlined.LocalCafe
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 
 @Composable
-fun FocusScreen(vm: FocusViewModel = viewModel()) {
+fun FocusScreen(vm: FocusViewModel = viewModel(), onOpenPlanner: () -> Unit = {} ) {
     val state by vm.uiState.collectAsState()
     val context = LocalContext.current
     LaunchedEffect(state.alarmTrigger) {
@@ -83,12 +99,15 @@ fun FocusScreen(vm: FocusViewModel = viewModel()) {
     val sessionActive = state.startedAtMillis != null
     val isPaused = sessionActive && !state.isRunning
 
-    Box(modifier = Modifier.fillMaxSize()) {
+    Box(modifier = Modifier.fillMaxSize().background(AppBg)
+    ) {
 
         Column(
             modifier = Modifier
                 .fillMaxSize()
+                .verticalScroll(rememberScrollState())
                 .padding(horizontal = 18.dp, vertical = 14.dp)
+                .padding(bottom = 110.dp)
         ) {
 
             // TOP BAR
@@ -133,6 +152,22 @@ fun FocusScreen(vm: FocusViewModel = viewModel()) {
                 modifier = Modifier.fillMaxWidth(),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
+                PlannerCard(onClick = onOpenPlanner)
+
+                Spacer(Modifier.height(12.dp))
+
+                var mode by remember { mutableStateOf(TimerMode.FOCUS) }
+
+                ModeTabs(
+                    selected = mode,
+                    onSelect = { mode = it }
+                )
+
+
+
+
+                Spacer(Modifier.height(14.dp))
+
 
                 TimerCircle(
                     remainingSeconds = state.remainingSeconds,
@@ -214,7 +249,7 @@ fun FocusScreen(vm: FocusViewModel = viewModel()) {
                 }
             }
 
-            Spacer(modifier = Modifier.weight(1f))
+            Spacer(Modifier.height(18.dp))
 
             SoftCard(
                 modifier = Modifier
@@ -510,4 +545,178 @@ private fun OutlineButton(text: String, onClick: () -> Unit, modifier: Modifier 
         Text(text, color = PinkPrimary, fontWeight = FontWeight.Bold)
     }
 }
+
+@Composable
+fun PlannerCard(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val grad = Brush.horizontalGradient(
+        colors = listOf(
+            PinkPrimary,
+            PinkPrimary.copy(alpha = 0.75f),
+            Color(0xFFFFB3D1)
+        )
+    )
+
+    Surface(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(92.dp)
+            .clip(RoundedCornerShape(22.dp))
+            .clickable { onClick() },
+        color = Color.Transparent,
+        shadowElevation = 6.dp
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(grad)
+                .padding(horizontal = 16.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(52.dp)
+                    .clip(CircleShape)
+                    .background(Color.White.copy(alpha = 0.22f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.CalendarMonth,
+                    contentDescription = "Calendar",
+                    tint = Color.White,
+                    modifier = Modifier.size(28.dp)
+                )
+            }
+
+            Spacer(Modifier.width(14.dp))
+
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "Planifie ta journée\nd'étude",
+                    color = Color.White,
+                    fontWeight = FontWeight.ExtraBold,
+                    fontSize = 18.sp,
+                    lineHeight = 20.sp
+                )
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    text = "Crée un planning de tâches",
+                    color = Color.White.copy(alpha = 0.92f),
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Medium
+                )
+            }
+
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(CircleShape)
+                    .background(Color.White.copy(alpha = 0.18f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.ChevronRight,
+                    contentDescription = "Go",
+                    tint = Color.White,
+                    modifier = Modifier.size(26.dp)
+                )
+            }
+        }
+    }
+}
+
+enum class TimerMode { FOCUS, STOPWATCH, POMODORO }
+
+
+@Composable
+fun ModeTabs(
+    selected: TimerMode,
+    onSelect: (TimerMode) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(64.dp),
+        color = Color.White,
+        shape = RoundedCornerShape(22.dp),
+        shadowElevation = 4.dp
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            TabPill(
+                text = "Focus",
+                icon = Icons.Outlined.AccessTime,
+                selected = selected == TimerMode.FOCUS,
+                onClick = { onSelect(TimerMode.FOCUS) },
+                modifier = Modifier.weight(0.9f)
+            )
+
+            TabPill(
+                text = "Stopwatch",
+                icon = Icons.Outlined.Timer,
+                selected = selected == TimerMode.STOPWATCH,
+                onClick = { onSelect(TimerMode.STOPWATCH) },
+                modifier = Modifier.weight(1.35f)
+            )
+
+            TabPill(
+                text = "Pomodoro",
+                icon = Icons.Outlined.Coffee,
+                selected = selected == TimerMode.POMODORO,
+                onClick = { onSelect(TimerMode.POMODORO) },
+                modifier = Modifier.weight(1.25f)
+            )
+        }
+    }
+}
+
+
+@Composable
+private fun TabPill(
+    text: String,
+    icon: ImageVector,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val bg = if (selected) PinkPrimary else Color.Transparent
+    val content = if (selected) Color.White else Color(0xFF6B7280)
+
+    Row(
+        modifier = modifier
+            .fillMaxHeight()
+            .clip(RoundedCornerShape(18.dp))
+            .background(bg)
+            .clickable { onClick() }
+            .padding(horizontal = 10.dp),   // important
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.Center
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = text,
+            tint = content,
+            modifier = Modifier.size(19.dp)
+        )
+        Spacer(Modifier.width(6.dp))
+
+        Text(
+            text = text,
+            color = content,
+            fontWeight = FontWeight.Bold,
+            fontSize = 14.sp,      // Pixel 5 OK
+            maxLines = 1,
+            softWrap = false
+        )
+    }
+}
+
 

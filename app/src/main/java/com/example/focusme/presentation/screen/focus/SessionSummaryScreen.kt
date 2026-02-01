@@ -106,7 +106,7 @@ fun SessionSummaryScreen(
 
             Spacer(Modifier.height(12.dp))
 
-            // Quote
+            // Quote.
             Box(
                 modifier = Modifier
                     .fillMaxWidth()

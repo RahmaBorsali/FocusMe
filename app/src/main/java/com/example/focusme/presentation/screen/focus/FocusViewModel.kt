@@ -43,7 +43,6 @@ data class FocusUiState(
     val focusRating: Int = 0,
     val satisfactionRating: Int = 0,
 
-    // optionnel : tu peux l'utiliser côté UI si tu veux
     val canSave: Boolean = false
 )
 

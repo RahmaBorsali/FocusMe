@@ -37,6 +37,9 @@ object NotificationHelper {
             .setAutoCancel(true)
             .build()
 
-        NotificationManagerCompat.from(context).notify(1001, notif)
+        try {
+            NotificationManagerCompat.from(context).notify(1001, notif)
+        } catch (_: SecurityException) {
+        }
     }
 }

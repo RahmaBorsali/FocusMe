@@ -12,11 +12,10 @@ class FriendsRepository(
 
     // ✅ Fake data (API simulée)
     private val users = listOf(
-        UserDto(1, "Rahma Borsali", "rahma"),
-        UserDto(2, "Takwa Borsali", "takwa"),
-        UserDto(3, "Eya Hammami", "eya"),
-        UserDto(4, "Tasnim Gmati", "tasnim"),
-        UserDto(5, "Maryem Anane", "maryem")
+        UserDto(1, "Hammami Dhiaeddine", "dhia"),
+        UserDto(2, "Essaied Haithem", "haithem"),
+        UserDto(3, "Mr Hafedh", "mr"),
+
     )
     suspend fun removeFriend(id: Int) {
         dao.deleteById(id)
