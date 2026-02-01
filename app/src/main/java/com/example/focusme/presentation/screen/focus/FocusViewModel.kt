@@ -43,7 +43,14 @@ data class FocusUiState(
     val focusRating: Int = 0,
     val satisfactionRating: Int = 0,
 
-    val canSave: Boolean = false
+    val showTasksSheet: Boolean = false,
+    val sessionTasks: List<String> = emptyList(),
+    val tempTaskText: String = "",
+    val startAfterSetTime: Boolean = false,
+    val canSave: Boolean = false,
+
+    val currentTaskIndex: Int = 0,
+    val sessionStartLabel: String = ""
 )
 
 class FocusViewModel : ViewModel() {
@@ -52,42 +59,6 @@ class FocusViewModel : ViewModel() {
     val uiState: StateFlow<FocusUiState> = _uiState
 
     private var timerJob: Job? = null
-
-    // --------------------
-    // SUMMARY INPUTS
-    // --------------------
-    fun updateTitle(v: String) = _uiState.update { it.copy(sessionTitle = v) }
-
-    fun setFocusRating(v: Int) = _uiState.update { s ->
-        val newCanSave = (v > 0 && s.satisfactionRating > 0)
-        s.copy(focusRating = v, canSave = newCanSave)
-    }
-
-    fun setSatisfactionRating(v: Int) = _uiState.update { s ->
-        val newCanSave = (s.focusRating > 0 && v > 0)
-        s.copy(satisfactionRating = v, canSave = newCanSave)
-    }
-
-    private fun canSaveNow(): Boolean {
-        val s = _uiState.value
-        return s.focusRating > 0 && s.satisfactionRating > 0
-    }
-
-    // --------------------
-    // SUMMARY BUTTONS
-    // --------------------
-    fun onIgnoreClick() = _uiState.update { it.copy(showIgnoreConfirmDialog = true) }
-    fun cancelIgnore() = _uiState.update { it.copy(showIgnoreConfirmDialog = false) }
-
-    fun confirmIgnore() {
-        _uiState.update { it.copy(showIgnoreConfirmDialog = false) }
-        closeSummaryAndReset()
-    }
-
-
-
-    fun closeSaveValidationDialog() =
-        _uiState.update { it.copy(showSaveValidationDialog = false) }
 
     fun onSaveClick(
         context: Context,
@@ -116,9 +87,6 @@ class FocusViewModel : ViewModel() {
         }
     }
 
-
-
-
     // --------------------
     // SET TIME
     // --------------------
@@ -137,20 +105,28 @@ class FocusViewModel : ViewModel() {
 
     fun confirmMinutes() {
         val secs = (_uiState.value.tempMinutes * 60).coerceAtLeast(0)
+        val shouldStart = _uiState.value.startAfterSetTime
+
         stopInternal()
-        _uiState.update {
-            it.copy(
+
+        _uiState.update { s ->
+            s.copy(
                 totalSeconds = secs,
                 remainingSeconds = secs,
                 isRunning = false,
                 showSetTimeDialog = false,
                 showQuickButtons = false,
                 showStopDialog = false,
+
+                // ✅ nouvelle session
                 startedAtMillis = null,
                 showSummary = false,
                 sessionSeconds = 0,
                 xpPoints = 0,
                 sessionEndedAtMillis = null,
+
+                // ✅ garde les tâches + mets à jour le compteur
+                tasksCount = s.sessionTasks.size,
 
                 // reset summary inputs
                 sessionTitle = "Étude du matin",
@@ -158,10 +134,22 @@ class FocusViewModel : ViewModel() {
                 satisfactionRating = 0,
                 canSave = false,
                 showSaveValidationDialog = false,
-                showIgnoreConfirmDialog = false
+                showIgnoreConfirmDialog = false,
+
+                // ✅ important
+                startAfterSetTime = false
             )
         }
+
+        if (shouldStart && secs > 0) startTimer()
     }
+
+
+    fun onStartPressed() {
+        _uiState.update { it.copy(startAfterSetTime = true) }
+        openSetTimeDialog()
+    }
+
 
     fun setMinutesQuick(minutes: Int) {
         val secs = (minutes * 60).coerceAtLeast(0)
@@ -201,6 +189,10 @@ class FocusViewModel : ViewModel() {
         if (s.startedAtMillis == null) {
             _uiState.update { it.copy(startedAtMillis = System.currentTimeMillis()) }
         }
+        if (_uiState.value.currentTaskIndex >= _uiState.value.sessionTasks.size) {
+            _uiState.update { it.copy(currentTaskIndex = 0) }
+        }
+
 
         _uiState.update { it.copy(isRunning = true) }
 
@@ -293,6 +285,29 @@ class FocusViewModel : ViewModel() {
         timerJob?.cancel()
         timerJob = null
     }
+    fun openTasksSheet() = _uiState.update { it.copy(showTasksSheet = true) }
+    fun closeTasksSheet() = _uiState.update { it.copy(showTasksSheet = false, tempTaskText = "") }
+
+    fun updateTempTask(text: String) = _uiState.update { it.copy(tempTaskText = text) }
+
+    fun addTempTask() {
+        val t = _uiState.value.tempTaskText.trim()
+        if (t.isBlank()) return
+        _uiState.update { s ->
+            s.copy(
+                sessionTasks = s.sessionTasks + t,
+                tempTaskText = ""
+            )
+        }
+    }
+
+    fun removeTask(index: Int) {
+        _uiState.update { s ->
+            s.copy(sessionTasks = s.sessionTasks.toMutableList().also { it.removeAt(index) })
+        }
+    }
+
+
 
 
 }

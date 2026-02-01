@@ -1,5 +1,7 @@
 package com.example.focusme.presentation.screen.focus
 
+
+import TasksSheet
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -47,6 +49,8 @@ import androidx.compose.material.icons.outlined.AccessTime
 import androidx.compose.material.icons.outlined.Coffee
 import androidx.compose.material.icons.outlined.Timer
 import androidx.compose.material.icons.outlined.LocalCafe
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -241,11 +245,20 @@ fun FocusScreen(vm: FocusViewModel = viewModel(), onOpenPlanner: () -> Unit = {}
                         else -> {
                             PrimaryButton(
                                 text = "▶ Démarrer",
-                                onClick = vm::startTimer,
+                                onClick = vm::onStartPressed,
                                 modifier = Modifier.fillMaxWidth()
                             )
                         }
+
                     }
+                }
+                if (sessionActive && state.sessionTasks.isNotEmpty()) {
+                    Spacer(Modifier.height(14.dp))
+
+                    TaskInProgressCard(
+                        taskTitle = state.sessionTasks.getOrNull(state.currentTaskIndex) ?: "",
+                        onManage = { vm.openTasksSheet() } // ouvre le sheet
+                    )
                 }
             }
 
@@ -254,7 +267,7 @@ fun FocusScreen(vm: FocusViewModel = viewModel(), onOpenPlanner: () -> Unit = {}
             SoftCard(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable { }
+                    .clickable { vm.openTasksSheet() }
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Box(
@@ -292,6 +305,24 @@ fun FocusScreen(vm: FocusViewModel = viewModel(), onOpenPlanner: () -> Unit = {}
 
             Spacer(Modifier.height(10.dp))
         }
+        if (state.showTasksSheet) {
+            TasksSheet(
+                sessionSeconds = state.remainingSeconds, // ou state.totalSeconds selon ce que tu veux afficher
+                tasks = state.sessionTasks,
+                taskInput = state.tempTaskText,
+                onTaskInputChange = vm::updateTempTask,
+                onAddTask = vm::addTempTask,
+                onRemoveTask = vm::removeTask,
+                onPickFromPlanner = { /* plus tard: nav vers planner */ },
+                onCancel = vm::closeTasksSheet,
+                onStart = {
+                    vm.closeTasksSheet()
+                    vm.onStartPressed()
+                },
+                onClose = vm::closeTasksSheet
+            )
+        }
+
 
         // OVERLAYS
         if (state.showSetTimeDialog) {
@@ -718,5 +749,77 @@ private fun TabPill(
         )
     }
 }
+@Composable
+fun TaskInProgressCard(
+    taskTitle: String,
+    onManage: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        color = Color.White,
+        shape = RoundedCornerShape(22.dp),
+        shadowElevation = 8.dp
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp)
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(46.dp)
+                        .clip(CircleShape)
+                        .background(PinkPrimary.copy(alpha = 0.14f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("📝", fontSize = 18.sp)
+                }
+
+                Spacer(Modifier.width(12.dp))
+
+                Text(
+                    text = "Tâche en cours",
+                    color = TextDark,
+                    fontWeight = FontWeight.ExtraBold,
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.weight(1f),
+                    textAlign = TextAlign.End
+                )
+            }
+
+            Spacer(Modifier.height(14.dp))
+
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("•", color = PinkPrimary, fontSize = 26.sp, lineHeight = 0.sp)
+                Spacer(Modifier.width(10.dp))
+                Text(
+                    text = taskTitle,
+                    color = TextDark,
+                    fontWeight = FontWeight.Medium,
+                    style = MaterialTheme.typography.bodyLarge
+                )
+            }
+
+            Spacer(Modifier.height(16.dp))
+
+            OutlinedButton(
+                onClick = onManage,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(48.dp),
+                shape = RoundedCornerShape(16.dp),
+                colors = ButtonDefaults.outlinedButtonColors(
+                    containerColor = Color.White,
+                    contentColor = TextDark
+                )
+            ) {
+                Text("Gérer les tâches", fontWeight = FontWeight.Bold)
+            }
+        }
+    }
+}
+
 
 
