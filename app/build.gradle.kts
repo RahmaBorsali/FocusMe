@@ -85,6 +85,10 @@ dependencies {
     implementation(libs.media3.exoplayer)
     implementation(libs.media3.common)
     implementation(libs.coil.compose)
+    implementation(libs.kotlinx.coroutines.android)
+
+    implementation(libs.kotlinx.datetime)
+
 
     ksp(libs.androidx.room.compiler)
 

@@ -48,7 +48,6 @@ import com.example.focusme.presentation.ui.theme.AppBg
 import androidx.compose.material.icons.outlined.AccessTime
 import androidx.compose.material.icons.outlined.Coffee
 import androidx.compose.material.icons.outlined.Timer
-import androidx.compose.material.icons.outlined.LocalCafe
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.runtime.mutableStateOf
@@ -313,7 +312,7 @@ fun FocusScreen(vm: FocusViewModel = viewModel(), onOpenPlanner: () -> Unit = {}
                 onTaskInputChange = vm::updateTempTask,
                 onAddTask = vm::addTempTask,
                 onRemoveTask = vm::removeTask,
-                onPickFromPlanner = { /* plus tard: nav vers planner */ },
+                onPickFromPlanner = onOpenPlanner,
                 onCancel = vm::closeTasksSheet,
                 onStart = {
                     vm.closeTasksSheet()

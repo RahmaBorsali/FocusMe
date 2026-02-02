@@ -9,6 +9,7 @@ import com.example.focusme.presentation.screen.challenges.CreateChallengeScreen
 import com.example.focusme.presentation.screen.feed.FeedScreen
 import com.example.focusme.presentation.screen.focus.FocusScreen
 import com.example.focusme.presentation.screen.music.MusicScreen
+import com.example.focusme.presentation.screen.planner.PlannerScreen
 import com.example.focusme.presentation.screen.profile.ProfileScreen
 
 @Composable
@@ -17,7 +18,11 @@ fun AppNavGraph(navController: NavHostController) {
         navController = navController,
         startDestination = Routes.FOCUS
     ) {
-        composable(Routes.FOCUS) { FocusScreen() }
+        composable(Routes.FOCUS) {
+            FocusScreen(
+                onOpenPlanner = { navController.navigate(Routes.PLANNER) }
+            )
+        }
         composable(Routes.FEED) { FeedScreen() }
         composable(Routes.MUSIC) { MusicScreen() }
 
@@ -35,5 +40,10 @@ fun AppNavGraph(navController: NavHostController) {
         }
 
         composable(Routes.PROFILE) { ProfileScreen() }
+        composable(Routes.PLANNER) {
+            PlannerScreen(onBack = { navController.popBackStack() })
+        }
+
+
     }
 }

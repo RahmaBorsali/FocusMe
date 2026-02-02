@@ -7,4 +7,6 @@ object Routes {
     const val CREATE_CHALLENGE = "create_challenge"
     const val MUSIC = "music"
     const val PROFILE = "profile"
+
+    const val PLANNER = "planner"
 }
