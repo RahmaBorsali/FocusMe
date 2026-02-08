@@ -19,4 +19,6 @@ object DbProvider {
                 .also { INSTANCE = it }
         }
     }
+
+    fun get(context: Context): AppDatabase = db(context)
 }
