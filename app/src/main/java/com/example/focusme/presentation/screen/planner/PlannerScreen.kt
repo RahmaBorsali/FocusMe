@@ -249,9 +249,13 @@ fun PlannerScreen(
 
                 OutlinedButton(
                     onClick = {
+                        if (ui.tasks.isEmpty()) {
+                            scope.launch { snackbarHostState.showSnackbar("Aucune tâche à copier") }
+                            return@OutlinedButton
+                        }
+
                         val text = buildString {
                             append("📅 ${dowShortFr(selectedDate)}, ${selectedDate.dayOfMonth} ${monthShortFr(selectedDate.monthNumber)}\n\n")
-                            if (ui.tasks.isEmpty()) append("Aucune tâche")
                             ui.tasks.forEachIndexed { i, t ->
                                 append("${i + 1}) ${t.title}\n")
                                 if (t.description.isNotBlank()) append("   - ${t.description}\n")
