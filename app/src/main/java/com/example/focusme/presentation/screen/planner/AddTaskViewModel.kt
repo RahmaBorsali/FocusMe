@@ -9,6 +9,8 @@ import com.example.focusme.data.repository.PlannerRepository
 import com.example.focusme.data.repository.SubjectRepository
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import kotlinx.datetime.*
+import kotlinx.datetime.Clock
 
 class AddTaskViewModel(app: Application) : AndroidViewModel(app) {
 
@@ -62,6 +64,8 @@ class AddTaskViewModel(app: Application) : AndroidViewModel(app) {
                             else -> PriorityUi.HIGH
                         },
                         selectedSubjectId = task.subjectId,
+                        startTimeMinutes = task.startTimeMinutes,
+
                         isLoading = false
                     )
                 }
@@ -93,6 +97,9 @@ class AddTaskViewModel(app: Application) : AndroidViewModel(app) {
             }
         }
     }
+    fun onStartTimeChange(minutesFromMidnight: Int) =
+        _ui.update { it.copy(startTimeMinutes = minutesFromMidnight.coerceIn(0, 23 * 60 + 59)) }
+
 
     fun createSubject(label: String, emoji: String, colorArgb: Long) {
         val safeLabel = label.trim().take(20)
@@ -116,11 +123,30 @@ class AddTaskViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             _ui.update { it.copy(isSaving = true) }
 
+            val taskDate = LocalDate.parse(currentDateKey)
+
+            val reminderLdt = computeReminderDateTime(
+                taskDate = taskDate,
+                startTimeMinutes = st.startTimeMinutes,
+                durationMinutes = st.minutes,
+                priority = st.priority
+            )
+
+            val reminderMillis = reminderLdt
+                .toInstant(TimeZone.currentSystemDefault())
+                .toEpochMilliseconds()
+
+            android.util.Log.d("REMINDER_CALC", "dateKey=$currentDateKey startMin=${st.startTimeMinutes} reminderLdt=$reminderLdt reminderMillis=$reminderMillis")
+
+
+            val title = st.title.trim()
+
             if (currentTaskId == null) {
-                plannerRepo.insert(
+
+                val newId = plannerRepo.insert(
                     PlannerTaskEntity(
                         dateKey = currentDateKey,
-                        title = st.title.trim(),
+                        title = title,
                         description = st.description.trim(),
                         minutes = st.minutes,
                         priority = when (st.priority) {
@@ -128,15 +154,24 @@ class AddTaskViewModel(app: Application) : AndroidViewModel(app) {
                             PriorityUi.MEDIUM -> 1
                             PriorityUi.HIGH -> 2
                         },
-                        subjectId = subjectId
+                        subjectId = subjectId,
+                        startTimeMinutes = st.startTimeMinutes
                     )
                 )
+
+                scheduleReminderExact(
+                    taskId = newId,
+                    title = title,
+                    reminderEpochMillis = reminderMillis
+                )
+
             } else {
+
                 plannerRepo.update(
                     PlannerTaskEntity(
                         id = currentTaskId!!,
                         dateKey = currentDateKey,
-                        title = st.title.trim(),
+                        title = title,
                         description = st.description.trim(),
                         minutes = st.minutes,
                         priority = when (st.priority) {
@@ -144,8 +179,15 @@ class AddTaskViewModel(app: Application) : AndroidViewModel(app) {
                             PriorityUi.MEDIUM -> 1
                             PriorityUi.HIGH -> 2
                         },
-                        subjectId = subjectId
+                        subjectId = subjectId,
+                        startTimeMinutes = st.startTimeMinutes
                     )
+                )
+
+                scheduleReminderExact(
+                    taskId = currentTaskId!!,
+                    title = title,
+                    reminderEpochMillis = reminderMillis
                 )
             }
 
@@ -153,6 +195,76 @@ class AddTaskViewModel(app: Application) : AndroidViewModel(app) {
             onSuccess()
         }
     }
+
+    private fun computeReminderDateTime(
+        taskDate: LocalDate,
+        startTimeMinutes: Int,
+        durationMinutes: Int,
+        priority: PriorityUi,
+        timeZone: TimeZone = TimeZone.currentSystemDefault(),
+        nowInstant: Instant = Clock.System.now()
+    ): LocalDateTime {
+
+        val hour = startTimeMinutes / 60
+        val minute = startTimeMinutes % 60
+
+        val taskStartLdt = LocalDateTime(
+            taskDate.year, taskDate.monthNumber, taskDate.dayOfMonth, hour, minute
+        )
+
+        val taskStartInstant = taskStartLdt.toInstant(timeZone)
+
+        fun bonusMinutes(p: PriorityUi) = when (p) {
+            PriorityUi.LOW -> 0
+            PriorityUi.MEDIUM -> 30
+            PriorityUi.HIGH -> 60
+        }
+
+        val nowLdt = nowInstant.toLocalDateTime(timeZone)
+        val tomorrow = nowLdt.date.plus(DatePeriod(days = 1))
+        val isTomorrowMorning = (taskStartLdt.date == tomorrow) && (taskStartLdt.hour in 6..11)
+
+        val baseReminderInstant: Instant = when {
+            durationMinutes <= 15 -> taskStartInstant.minus(30, DateTimeUnit.MINUTE, timeZone)
+            durationMinutes in 16..45 -> taskStartInstant.minus(1, DateTimeUnit.HOUR, timeZone)
+            durationMinutes in 46..89 -> taskStartInstant.minus(2, DateTimeUnit.HOUR, timeZone)
+            durationMinutes in 90..180 -> taskStartInstant.minus(4, DateTimeUnit.HOUR, timeZone)
+            else -> {
+                if (isTomorrowMorning) {
+                    // veille à 20:00
+                    val veille = taskStartLdt.date.minus(DatePeriod(days = 1))
+                    val veille20 = LocalDateTime(
+                        veille.year, veille.monthNumber, veille.dayOfMonth, 20, 0
+                    )
+                    veille20.toInstant(timeZone)
+                } else {
+                    taskStartInstant.minus(6, DateTimeUnit.HOUR, timeZone)
+                }
+            }
+        }
+
+        val reminderWithBonus = baseReminderInstant.minus(bonusMinutes(priority), DateTimeUnit.MINUTE, timeZone)
+        return reminderWithBonus.toLocalDateTime(timeZone)
+    }
+    private fun scheduleReminderExact(
+        taskId: Long,
+        title: String,
+        reminderEpochMillis: Long
+    ) {
+        com.example.focusme.reminder.AlarmReminderScheduler.cancel(getApplication(), taskId)
+
+        com.example.focusme.reminder.AlarmReminderScheduler.scheduleExact(
+            context = getApplication(),
+            taskId = taskId,
+            triggerAtMillis = reminderEpochMillis,
+            title = title,
+            body = "N'oublie pas ta tâche !"
+        )
+    }
+
+
+
+
 
 
 }

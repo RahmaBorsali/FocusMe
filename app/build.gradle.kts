@@ -7,7 +7,7 @@ plugins {
 
 android {
     namespace = "com.example.focusme"
-    compileSdk = 34
+    compileSdk = 35
 
     defaultConfig {
         applicationId = "com.example.focusme"
@@ -89,6 +89,7 @@ dependencies {
 
     implementation(libs.kotlinx.datetime)
     implementation(libs.androidx.foundation.android)
+    implementation(libs.androidx.work.runtime.ktx)
 
 
     ksp(libs.androidx.room.compiler)

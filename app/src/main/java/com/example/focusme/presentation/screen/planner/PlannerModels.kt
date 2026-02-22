@@ -14,6 +14,7 @@ data class AddTaskUiState(
     val description: String = "",
     val minutes: Int = 25,
     val priority: PriorityUi = PriorityUi.MEDIUM,
+    val startTimeMinutes: Int = 9 * 60, // 09:00 par défaut
     val selectedSubjectId: Long? = null,
     val subjects: List<SubjectUi> = emptyList(),
     val showAddSubjectDialog: Boolean = false,

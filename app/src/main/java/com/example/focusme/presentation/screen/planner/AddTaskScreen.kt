@@ -217,6 +217,47 @@ fun AddTaskScreen(
             }
 
             Spacer(Modifier.height(12.dp))
+            CardLike(cardBg) {
+                SectionTitle(icon = "🕒", title = "Heure de la tâche", textDark = textDark)
+                Spacer(Modifier.height(10.dp))
+
+                val hour = ui.startTimeMinutes / 60
+                val minute = ui.startTimeMinutes % 60
+                val label = "%02d:%02d".format(hour, minute)
+
+                var openPicker by remember { mutableStateOf(false) }
+
+                Surface(
+                    modifier = Modifier.fillMaxWidth().height(56.dp),
+                    shape = RoundedCornerShape(16.dp),
+                    color = Color(0xFFF7F7F7),
+                    border = BorderStroke(1.dp, chipUnselectedBorder)
+                ) {
+                    Row(
+                        Modifier.fillMaxSize().clickable { openPicker = true }.padding(horizontal = 16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(label, fontWeight = FontWeight.ExtraBold, color = textDark)
+                        Text("Modifier", color = pink, fontWeight = FontWeight.Bold)
+                    }
+                }
+
+                if (openPicker) {
+                    TimePickerDialog(
+                        initialHour = hour,
+                        initialMinute = minute,
+                        onDismiss = { openPicker = false },
+                        onConfirm = { h, m ->
+                            vm.onStartTimeChange(h * 60 + m)
+                            openPicker = false
+                        }
+                    )
+                }
+            }
+
+            Spacer(Modifier.height(12.dp))
+
 
             CardLike(cardBg) {
                 SectionTitle(icon = "🎯", title = "Priorité", textDark = textDark)
@@ -863,6 +904,32 @@ private fun StepButton(label: String, onClick: () -> Unit, border: Color) {
     ) {
         Text(label, fontWeight = FontWeight.Black, style = MaterialTheme.typography.titleLarge)
     }
+}
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun TimePickerDialog(
+    initialHour: Int,
+    initialMinute: Int,
+    onDismiss: () -> Unit,
+    onConfirm: (Int, Int) -> Unit
+) {
+    val state = rememberTimePickerState(
+        initialHour = initialHour,
+        initialMinute = initialMinute,
+        is24Hour = true
+    )
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = {
+            TextButton(onClick = { onConfirm(state.hour, state.minute) }) { Text("OK") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Annuler") }
+        },
+        title = { Text("Choisir l'heure") },
+        text = { TimePicker(state = state) }
+    )
 }
 
 

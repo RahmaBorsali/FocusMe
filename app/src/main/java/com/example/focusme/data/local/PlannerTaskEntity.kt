@@ -11,5 +11,7 @@ data class PlannerTaskEntity(
     val description: String,
     val minutes: Int,
     val priority: Int,
-    val subjectId: Long
+    val subjectId: Long,
+    val startTimeMinutes: Int
+
 )
