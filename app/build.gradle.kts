@@ -90,6 +90,7 @@ dependencies {
     implementation(libs.kotlinx.datetime)
     implementation(libs.androidx.foundation.android)
     implementation(libs.androidx.work.runtime.ktx)
+    implementation(libs.androidx.datastore.preferences)
 
 
     ksp(libs.androidx.room.compiler)

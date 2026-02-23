@@ -79,18 +79,32 @@ private fun AppRoot() {
         BottomNavItem(Routes.PROFILE, "Profil", Icons.Default.Person)
     )
 
-    val currentRoute = navController.currentBackStackEntryAsState().value?.destination?.route
+    val navBackStackEntry = navController.currentBackStackEntryAsState()
+    val currentRoute = navBackStackEntry.value?.destination?.route
+
+    val authRoutes = listOf(Routes.WELCOME, Routes.LOGIN, Routes.SIGNUP_CHOICE, Routes.SIGNUP, Routes.FORGOT_PASSWORD)
+    val showBottomBar = currentRoute !in authRoutes
 
     Scaffold(
         bottomBar = {
-            NavigationBar {
-                items.forEach { item ->
-                    NavigationBarItem(
-                        selected = currentRoute == item.route,
-                        onClick = { navController.navigate(item.route) },
-                        icon = { Icon(item.icon, contentDescription = item.label) },
-                        label = { Text(item.label) }
-                    )
+            if (showBottomBar) {
+                NavigationBar {
+                    items.forEach { item ->
+                        NavigationBarItem(
+                            selected = currentRoute == item.route,
+                            onClick = {
+                                navController.navigate(item.route) {
+                                    popUpTo(navController.graph.startDestinationId) {
+                                        saveState = true
+                                    }
+                                    launchSingleTop = true
+                                    restoreState = true
+                                }
+                            },
+                            icon = { Icon(item.icon, contentDescription = item.label) },
+                            label = { Text(item.label) }
+                        )
+                    }
                 }
             }
         }

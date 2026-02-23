@@ -18,14 +18,72 @@ import androidx.navigation.navArgument
 import kotlinx.datetime.Clock
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
-
+import com.example.focusme.presentation.screen.auth.WelcomeScreen
+import com.example.focusme.presentation.screen.auth.LoginScreen
+import com.example.focusme.presentation.screen.auth.SignupChoiceScreen
+import com.example.focusme.presentation.screen.auth.SignupScreen
+import com.example.focusme.presentation.screen.auth.ForgotPasswordScreen
 
 @Composable
 fun AppNavGraph(navController: NavHostController) {
     NavHost(
         navController = navController,
-        startDestination = Routes.FOCUS
+        startDestination = Routes.WELCOME
     ) {
+        composable(Routes.WELCOME) {
+            WelcomeScreen(
+                onStartJourney = { navController.navigate(Routes.SIGNUP_CHOICE) },
+                onHaveAccount = { navController.navigate(Routes.LOGIN) },
+                onContinueAsGuest = { navController.navigate(Routes.FOCUS) } // UI only (guest)
+            )
+        }
+
+        composable(Routes.LOGIN) {
+            LoginScreen(
+                onBack = { navController.popBackStack() },
+                onLogin = { email, password ->
+                    // TODO: call backend later
+                    navController.navigate(Routes.FOCUS) {
+                        popUpTo(Routes.WELCOME) { inclusive = true }
+                    }
+                },
+                onCreateAccount = { navController.navigate(Routes.SIGNUP_CHOICE) },
+                onForgotPassword = { navController.navigate(Routes.FORGOT_PASSWORD) }
+            )
+        }
+
+        composable(Routes.SIGNUP_CHOICE) {
+            SignupChoiceScreen(
+                onBack = { navController.popBackStack() },
+                onContinueWithGoogle = { /* TODO later */ },
+                onContinueWithEmail = { navController.navigate(Routes.SIGNUP) },
+                onLogin = { navController.navigate(Routes.LOGIN) }
+            )
+        }
+
+        composable(Routes.SIGNUP) {
+            SignupScreen(
+                onBack = { navController.popBackStack() },
+                onSignup = { username, email, password, confirm ->
+                    // TODO: call backend later
+                    // After signup: go to login or show "check your email"
+                    navController.navigate(Routes.LOGIN) {
+                        popUpTo(Routes.WELCOME) { inclusive = false }
+                    }
+                }
+            )
+        }
+
+        composable(Routes.FORGOT_PASSWORD) {
+            ForgotPasswordScreen(
+                onBack = { navController.popBackStack() },
+                onResetPassword = { email ->
+                    // TODO: call backend reset
+                    navController.popBackStack()
+                }
+            )
+        }
+
         composable(Routes.FOCUS) {
             FocusScreen(
                 onOpenPlanner = { navController.navigate(Routes.PLANNER) }
