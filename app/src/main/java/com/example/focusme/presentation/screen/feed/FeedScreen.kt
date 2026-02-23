@@ -1,5 +1,6 @@
 package com.example.focusme.presentation.screen.feed
 
+import com.example.focusme.presentation.model.UserUi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -8,7 +9,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.People
 import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material3.*
@@ -29,7 +30,7 @@ import com.example.focusme.presentation.ui.theme.TextGray
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun FeedScreen(
-    onNotifications: () -> Unit = {},
+    onFriendRequests: () -> Unit = {},
     vm: FindFriendsViewModel = viewModel()
 ) {
     val state by vm.uiState.collectAsState()
@@ -71,9 +72,9 @@ fun FeedScreen(
 
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 HeaderSquareButton(
-                    icon = Icons.Default.Notifications,
-                    label = "Notifications",
-                    onClick = onNotifications
+                    icon = Icons.Default.Groups,
+                    label = "Demandes",
+                    onClick = onFriendRequests
                 )
                 HeaderSquareButton(
                     icon = Icons.Default.PersonAdd,
@@ -166,7 +167,7 @@ fun FeedScreen(
 
 @Composable
 private fun FriendInFeedCard(
-    friend: UserDto,
+    friend: UserUi,
     onRemove: () -> Unit
 ) {
     Row(

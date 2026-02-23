@@ -82,7 +82,7 @@ private fun AppRoot() {
     val navBackStackEntry = navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry.value?.destination?.route
 
-    val authRoutes = listOf(Routes.WELCOME, Routes.LOGIN, Routes.SIGNUP_CHOICE, Routes.SIGNUP, Routes.FORGOT_PASSWORD)
+    val authRoutes = listOf(Routes.WELCOME, Routes.LOGIN, Routes.SIGNUP_CHOICE, Routes.SIGNUP, Routes.FORGOT_PASSWORD, Routes.FRIEND_REQUESTS)
     val showBottomBar = currentRoute !in authRoutes
 
     Scaffold(

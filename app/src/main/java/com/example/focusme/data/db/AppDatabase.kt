@@ -6,7 +6,6 @@ import com.example.focusme.data.local.*
 
 @Database(
     entities = [
-        FriendEntity::class,
         StudySessionEntity::class,
 
         SubjectEntity::class,
@@ -17,7 +16,6 @@ import com.example.focusme.data.local.*
 )
 abstract class AppDatabase : RoomDatabase() {
 
-    abstract fun friendsDao(): FriendsDao
     abstract fun studySessionDao(): StudySessionDao
 
     abstract fun subjectDao(): SubjectDao

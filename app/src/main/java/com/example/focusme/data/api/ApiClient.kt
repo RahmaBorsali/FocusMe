@@ -40,4 +40,7 @@ object ApiClient {
 
     fun authApi(context: Context): AuthApi =
         createRetrofit(context).create(AuthApi::class.java)
+
+    fun friendsApi(context: Context): FriendsApi =
+        createRetrofit(context).create(FriendsApi::class.java)
 }
