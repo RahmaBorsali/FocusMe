@@ -9,9 +9,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Groups
-import androidx.compose.material.icons.filled.People
-import androidx.compose.material.icons.filled.PersonAdd
+import androidx.compose.material.icons.filled.*
+import com.example.focusme.presentation.ui.components.FocusMeDialog
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -38,6 +37,22 @@ fun FeedScreen(
 
     var showSheet by remember { mutableStateOf(false) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    
+    var friendToRemove by remember { mutableStateOf<UserUi?>(null) }
+
+    if (friendToRemove != null) {
+        FocusMeDialog(
+            title = "Supprimer l'ami ?",
+            message = "Es-tu sûr de vouloir retirer ${friendToRemove?.name} de tes amis ?",
+            confirmText = "Supprimer",
+            icon = { Icon(Icons.Default.PersonRemove, contentDescription = null, tint = PinkPrimary) },
+            onConfirm = {
+                vm.removeFriend(friendToRemove!!.id)
+                friendToRemove = null
+            },
+            onDismiss = { friendToRemove = null }
+        )
+    }
 
     val bg = Color(0xFFFBEAF2)
 
@@ -139,7 +154,7 @@ fun FeedScreen(
                 items(friends, key = { it.id }) { f ->
                     FriendInFeedCard(
                         friend = f,
-                        onRemove = { vm.removeFriend(f.id) }
+                        onRemove = { friendToRemove = f }
                     )
                 }
 

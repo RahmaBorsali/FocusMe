@@ -22,6 +22,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.focusme.presentation.ui.components.FocusMeDialog
 import com.example.focusme.presentation.ui.theme.*
 import com.example.focusme.data.api.dto.*
 
@@ -32,6 +33,37 @@ fun FriendRequestsScreen(
 ) {
     val state by vm.uiState.collectAsState()
     var selectedTab by remember { mutableStateOf(0) } // 0: Incoming, 1: Outgoing
+
+    var requestToAccept by remember { mutableStateOf<IncomingRequestItem?>(null) }
+    var requestToReject by remember { mutableStateOf<IncomingRequestItem?>(null) }
+
+    if (requestToAccept != null) {
+        FocusMeDialog(
+            title = "Accepter l'invitation ?",
+            message = "Souhaites-tu ajouter ${requestToAccept?.fromUser?.username} à tes amis ?",
+            confirmText = "Accepter",
+            icon = { Icon(Icons.Default.PersonAdd, contentDescription = null, tint = PinkPrimary) },
+            onConfirm = {
+                vm.acceptRequest(requestToAccept!!.requestId)
+                requestToAccept = null
+            },
+            onDismiss = { requestToAccept = null }
+        )
+    }
+
+    if (requestToReject != null) {
+        FocusMeDialog(
+            title = "Refuser l'invitation ?",
+            message = "Es-tu sûr de vouloir refuser la demande de ${requestToReject?.fromUser?.username} ?",
+            confirmText = "Refuser",
+            icon = { Icon(Icons.Default.PersonRemove, contentDescription = null, tint = PinkPrimary) },
+            onConfirm = {
+                vm.rejectRequest(requestToReject!!.requestId)
+                requestToReject = null
+            },
+            onDismiss = { requestToReject = null }
+        )
+    }
 
     Column(
         modifier = Modifier
@@ -113,8 +145,8 @@ fun FriendRequestsScreen(
                 if (selectedTab == 0) {
                     IncomingTabContent(
                         list = state.incoming,
-                        onAccept = vm::acceptRequest,
-                        onReject = vm::rejectRequest
+                        onAccept = { requestToAccept = it },
+                        onReject = { requestToReject = it }
                     )
                 } else {
                     OutgoingTabContent(list = state.outgoing)
@@ -148,8 +180,8 @@ fun TabItem(text: String, isSelected: Boolean, modifier: Modifier, onClick: () -
 @Composable
 fun IncomingTabContent(
     list: List<IncomingRequestItem>,
-    onAccept: (String) -> Unit,
-    onReject: (String) -> Unit
+    onAccept: (IncomingRequestItem) -> Unit,
+    onReject: (IncomingRequestItem) -> Unit
 ) {
     if (list.isEmpty()) {
         EmptyState(
@@ -168,13 +200,13 @@ fun IncomingTabContent(
                     actions = {
                         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                             Button(
-                                onClick = { onAccept(item.requestId) },
+                                onClick = { onAccept(item) },
                                 colors = ButtonDefaults.buttonColors(containerColor = PinkPrimary),
                                 shape = RoundedCornerShape(12.dp),
                                 modifier = Modifier.weight(1f)
                             ) { Text("Accepter", color = Color.White) }
                             OutlinedButton(
-                                onClick = { onReject(item.requestId) },
+                                onClick = { onReject(item) },
                                 shape = RoundedCornerShape(12.dp),
                                 border = androidx.compose.foundation.BorderStroke(1.dp, BorderSoft),
                                 modifier = Modifier.weight(1f)
