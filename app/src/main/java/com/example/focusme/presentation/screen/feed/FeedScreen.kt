@@ -174,6 +174,8 @@ fun FeedScreen(
                 state = state,
                 onQueryChange = vm::onQueryChange,
                 onAddFriend = vm::addFriend,
+                onAcceptRequest = vm::acceptRequest,
+                onRejectRequest = vm::rejectRequest,
                 onClose = { showSheet = false }
             )
         }

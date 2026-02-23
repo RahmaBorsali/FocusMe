@@ -18,9 +18,11 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.focusme.presentation.model.FriendStatus
 import com.example.focusme.presentation.ui.theme.AppBg
 import com.example.focusme.presentation.ui.theme.BorderSoft
 import com.example.focusme.presentation.ui.theme.PinkPrimary
@@ -33,6 +35,8 @@ fun FindFriendsSheet(
     state: FindFriendsUiState,
     onQueryChange: (String) -> Unit,
     onAddFriend: (UserUi) -> Unit,
+    onAcceptRequest: (String) -> Unit,
+    onRejectRequest: (String) -> Unit,
     onClose: () -> Unit
 ) {
     var localQuery by remember { mutableStateOf(state.query) }
@@ -141,55 +145,64 @@ fun FindFriendsSheet(
             }
         }
 
-        // Empty/Initial State
-        if (state.results.isEmpty() && !state.isLoading) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 40.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(100.dp)
-                        .clip(CircleShape)
-                        .background(AppBg),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        Icons.Default.PersonSearch,
-                        contentDescription = null,
-                        modifier = Modifier.size(48.dp),
-                        tint = PinkPrimary.copy(alpha = 0.5f)
-                    )
-                }
-                Spacer(Modifier.height(16.dp))
-                Text(
-                    "Cherche par pseudo",
-                    color = TextDark,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 16.sp
-                )
-                Text(
-                    "Tes futurs amis t'attendent !",
-                    color = TextGray,
-                    fontSize = 14.sp
-                )
-            }
-        }
-
-        // Results
+        // Results / Suggestions / My Friends
         LazyColumn(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 24.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+            contentPadding = PaddingValues(bottom = 20.dp)
         ) {
-            items(state.results, key = { it.id }) { user ->
-                FriendRow(
-                    user = user,
-                    onAdd = { onAddFriend(user) }
+            // Section: Mes amis
+            if (state.friends.isNotEmpty()) {
+                item {
+                    Text(
+                        "Mes amis",
+                        fontWeight = FontWeight.Bold,
+                        color = TextDark,
+                        fontSize = 16.sp,
+                        modifier = Modifier.padding(vertical = 8.dp)
+                    )
+                }
+                items(state.friends, key = { "friend_${it.id}" }) { user ->
+                    FriendRow(
+                        user = user, 
+                        onAdd = { onAddFriend(user) }
+                    )
+                }
+                item { Spacer(Modifier.height(8.dp)) }
+            }
+
+            // Section: Suggestions / Résultats
+            item {
+                Text(
+                    if (localQuery.isBlank()) "Suggestions" else "Résultats",
+                    fontWeight = FontWeight.Bold,
+                    color = TextDark,
+                    fontSize = 16.sp,
+                    modifier = Modifier.padding(vertical = 8.dp)
                 )
+            }
+
+            val listToShow = if (localQuery.isBlank()) state.suggestions else state.results
+            
+            if (listToShow.isEmpty() && !state.isLoading) {
+                item {
+                    Text(
+                        "Aucun résultat trouvé",
+                        color = TextGray,
+                        fontSize = 14.sp,
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 20.dp),
+                        textAlign = TextAlign.Center
+                    )
+                }
+            } else {
+                items(listToShow, key = { "result_${it.id}" }) { user ->
+                    FriendRow(
+                        user = user, 
+                        onAdd = { onAddFriend(user) }
+                    )
+                }
             }
         }
 
@@ -205,13 +218,16 @@ fun FindFriendsSheet(
 }
 
 @Composable
-private fun FriendRow(user: UserUi, onAdd: () -> Unit) {
+private fun FriendRow(
+    user: UserUi, 
+    onAdd: () -> Unit
+) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        color = Color.White,
+        shape = RoundedCornerShape(20.dp),
+        color = if (user.status == FriendStatus.INCOMING_PENDING) Color(0xFFFFF5F9) else Color.White,
         shadowElevation = 2.dp,
-        border = BorderStroke(1.dp, BorderSoft)
+        border = BorderStroke(1.dp, if (user.status == FriendStatus.INCOMING_PENDING) PinkPrimary.copy(alpha = 0.2f) else BorderSoft)
     ) {
         Row(
             modifier = Modifier
@@ -221,12 +237,12 @@ private fun FriendRow(user: UserUi, onAdd: () -> Unit) {
         ) {
             Box(
                 modifier = Modifier
-                    .size(48.dp)
+                    .size(52.dp)
                     .clip(CircleShape)
                     .background(AppBg),
                 contentAlignment = Alignment.Center
             ) {
-                Text("👤", fontSize = 20.sp)
+                Text("👤", fontSize = 22.sp)
             }
 
             Spacer(Modifier.width(14.dp))
@@ -241,30 +257,63 @@ private fun FriendRow(user: UserUi, onAdd: () -> Unit) {
                     overflow = TextOverflow.Ellipsis
                 )
                 Text(
-                    "@${user.username}",
-                    color = TextGray,
-                    fontSize = 13.sp
+                    if (user.status == FriendStatus.INCOMING_PENDING) "T'a envoyé une invitation" else "@${user.username}",
+                    color = if (user.status == FriendStatus.INCOMING_PENDING) PinkPrimary else TextGray,
+                    fontSize = 12.sp,
+                    fontWeight = if (user.status == FriendStatus.INCOMING_PENDING) FontWeight.Medium else FontWeight.Normal
                 )
             }
 
-            if (user.isFriend) {
-                Icon(
-                    imageVector = Icons.Default.CheckCircle,
-                    contentDescription = "Added",
-                    tint = Color(0xFF4CAF50),
-                    modifier = Modifier.size(24.dp)
-                )
-            } else {
-                Button(
-                    onClick = onAdd,
-                    colors = ButtonDefaults.buttonColors(containerColor = PinkPrimary),
-                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-                    shape = RoundedCornerShape(12.dp),
-                    modifier = Modifier.height(36.dp)
-                ) {
-                    Text("Ajouter", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+            // Actions Area
+            when (user.status) {
+                FriendStatus.FRIEND -> {
+                    StatusBadge(text = "Ami", icon = Icons.Default.CheckCircle, Color(0xFFE3F2FD), Color(0xFF1976D2))
+                }
+                FriendStatus.OUTGOING_PENDING -> {
+                    StatusBadge(text = "Envoyée", icon = Icons.Default.Check, Color(0xFFE8F5E9), Color(0xFF2E7D32))
+                }
+                FriendStatus.NONE -> {
+                    Button(
+                        onClick = onAdd,
+                        colors = ButtonDefaults.buttonColors(containerColor = PinkPrimary),
+                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.height(38.dp)
+                    ) {
+                        Text("Ajouter", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+                FriendStatus.INCOMING_PENDING -> {
+                    StatusBadge(text = "En attente", icon = Icons.Default.Timer, Color(0xFFFFF9C4), Color(0xFFFBC02D))
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun StatusBadge(text: String, icon: androidx.compose.ui.graphics.vector.ImageVector, bgColor: Color, contentColor: Color) {
+    Surface(
+        color = bgColor,
+        shape = RoundedCornerShape(8.dp)
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = text,
+                tint = contentColor,
+                modifier = Modifier.size(16.dp)
+            )
+            Text(
+                text,
+                color = contentColor,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold
+            )
         }
     }
 }

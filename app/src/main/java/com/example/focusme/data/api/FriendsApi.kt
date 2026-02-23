@@ -27,4 +27,8 @@ interface FriendsApi {
 
     @DELETE("friends/{friendUserId}")
     suspend fun deleteFriend(@Path("friendUserId") friendUserId: String): Map<String, Any>
+
+    @GET("users/suggestions")
+    suspend fun suggestions(): List<UserDto>
+
 }

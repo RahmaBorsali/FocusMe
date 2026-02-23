@@ -16,6 +16,7 @@ class FriendsRepository(context: Context) {
     suspend fun reject(requestId: String): Result<Unit> = safe { api.reject(requestId); Unit }
     suspend fun friends(): Result<List<UserDto>> = safe { api.friends() }
     suspend fun deleteFriend(friendId: String): Result<Unit> = safe { api.deleteFriend(friendId); Unit }
+    suspend fun suggestions(): Result<List<UserDto>> = safe { api.suggestions() }
 
     private suspend fun <T> safe(block: suspend () -> T): Result<T> = try {
         Result.success(block())
@@ -24,4 +25,5 @@ class FriendsRepository(context: Context) {
     } catch (e: Exception) {
         Result.failure(e)
     }
+
 }
