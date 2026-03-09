@@ -19,4 +19,6 @@ object Routes {
     const val EDIT_TASK = "edit_task/{taskId}"
     fun editTaskRoute(taskId: Long) = "edit_task/$taskId"
     const val FRIEND_REQUESTS = "friend_requests"
+    const val FRIENDS_FEED = "friends_feed"
+    const val LEADERBOARD = "leaderboard"
 }

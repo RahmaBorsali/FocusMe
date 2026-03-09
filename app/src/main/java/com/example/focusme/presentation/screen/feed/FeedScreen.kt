@@ -30,6 +30,8 @@ import com.example.focusme.presentation.ui.theme.TextGray
 @Composable
 fun FeedScreen(
     onFriendRequests: () -> Unit = {},
+    onFriendsFeed: () -> Unit = {},
+    onLeaderboard: () -> Unit = {},
     vm: FindFriendsViewModel = viewModel()
 ) {
     val state by vm.uiState.collectAsState()
@@ -63,29 +65,26 @@ fun FeedScreen(
             .padding(horizontal = 18.dp, vertical = 16.dp)
     ) {
         // Header
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.Top,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = "Activité des amis",
-                    color = TextDark,
-                    fontWeight = FontWeight.ExtraBold,
-                    style = MaterialTheme.typography.headlineLarge
-                )
-                Spacer(Modifier.height(6.dp))
-                Text(
-                    text = "Soutenez vos amis, motivez-vous\net progressez ensemble 💪",
-                    color = TextGray,
-                    style = MaterialTheme.typography.bodyLarge
-                )
-            }
+        Column(modifier = Modifier.fillMaxWidth()) {
+            Text(
+                text = "Activité des amis",
+                color = TextDark,
+                fontWeight = FontWeight.ExtraBold,
+                style = MaterialTheme.typography.headlineMedium
+            )
+            Spacer(Modifier.height(4.dp))
+            Text(
+                text = "Soutenez vos amis, motivez-vous et progressez ensemble 💪",
+                color = TextGray,
+                style = MaterialTheme.typography.bodyMedium
+            )
 
-            Spacer(Modifier.width(10.dp))
+            Spacer(Modifier.height(16.dp))
 
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceEvenly
+            ) {
                 HeaderSquareButton(
                     icon = Icons.Default.Groups,
                     label = "Demandes",
@@ -95,6 +94,16 @@ fun FeedScreen(
                     icon = Icons.Default.PersonAdd,
                     label = "Ajouter",
                     onClick = { showSheet = true }
+                )
+                HeaderSquareButton(
+                    icon = Icons.Default.Leaderboard,
+                    label = "Activité",
+                    onClick = onFriendsFeed
+                )
+                HeaderSquareButton(
+                    icon = Icons.Default.EmojiEvents,
+                    label = "Classement",
+                    onClick = onLeaderboard
                 )
             }
         }
@@ -231,16 +240,16 @@ private fun HeaderSquareButton(
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Box(
             modifier = Modifier
-                .size(56.dp)
-                .clip(RoundedCornerShape(16.dp))
+                .size(50.dp)
+                .clip(RoundedCornerShape(14.dp))
                 .background(Color.White)
                 .clickable { onClick() },
             contentAlignment = Alignment.Center
         ) {
-            Icon(imageVector = icon, contentDescription = label, tint = PinkPrimary)
+            Icon(imageVector = icon, contentDescription = label, tint = PinkPrimary, modifier = Modifier.size(22.dp))
         }
-        Spacer(Modifier.height(6.dp))
-        Text(text = label, color = TextGray, style = MaterialTheme.typography.bodySmall)
+        Spacer(Modifier.height(4.dp))
+        Text(text = label, color = TextGray, style = MaterialTheme.typography.labelSmall)
     }
 }
 

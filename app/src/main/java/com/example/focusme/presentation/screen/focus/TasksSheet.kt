@@ -1,3 +1,5 @@
+package com.example.focusme.presentation.screen.focus
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -8,33 +10,39 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CalendarMonth
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.example.focusme.data.local.TaskEntity
 import com.example.focusme.presentation.ui.theme.PinkPrimary
 import com.example.focusme.presentation.ui.theme.TextDark
 import com.example.focusme.presentation.ui.theme.TextGray
-import androidx.compose.ui.unit.sp
-
+import java.util.Calendar
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TasksSheet(
     sessionSeconds: Int,
-    tasks: List<String>,
+    tasks: List<TaskEntity>,
     taskInput: String,
     onTaskInputChange: (String) -> Unit,
     onAddTask: () -> Unit,
     onRemoveTask: (Int) -> Unit,
+    onCompleteTask: (index: Int) -> Unit = {},
+    onPostponeTask: (index: Int, newDate: String) -> Unit = { _, _ -> },
     onPickFromPlanner: () -> Unit,
     onCancel: () -> Unit,
     onStart: () -> Unit,
@@ -48,16 +56,13 @@ fun TasksSheet(
         )
     )
 
-    // ✅ format temps (MM:SS)
     val timeText = remember(sessionSeconds) {
         val mm = (sessionSeconds.coerceAtLeast(0)) / 60
         val ss = (sessionSeconds.coerceAtLeast(0)) % 60
         "%02d:%02d".format(mm, ss)
     }
 
-    val sheetState = rememberModalBottomSheetState(
-        skipPartiallyExpanded = true
-    )
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     ModalBottomSheet(
         onDismissRequest = onClose,
@@ -66,14 +71,12 @@ fun TasksSheet(
         shape = RoundedCornerShape(topStart = 26.dp, topEnd = 26.dp),
         dragHandle = null
     ) {
-        // ✅ IMPORTANT: limite la hauteur pour qu’elle soit “plus haut” (comme ton exemple)
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .fillMaxHeight(0.86f) // ajuste: 0.82f / 0.86f / 0.90f
+                .fillMaxHeight(0.86f)
         ) {
-
-            // HEADER (rose dégradé)
+            // HEADER
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -91,68 +94,41 @@ fun TasksSheet(
 
                 Spacer(Modifier.weight(1f))
 
-                Text(
-                    text = timeText,
-                    color = Color.White,
-                    fontWeight = FontWeight.ExtraBold,
-                    style = MaterialTheme.typography.titleLarge
-                )
-
-                Spacer(Modifier.width(12.dp))
-
-                Box(
-                    modifier = Modifier
-                        .size(40.dp)
-                        .clip(CircleShape)
-                        .background(Color.White.copy(alpha = 0.22f))
-                        .clickable { onClose() },
-                    contentAlignment = Alignment.Center
-                ) {
+                IconButton(onClick = onClose) {
                     Icon(Icons.Default.Close, contentDescription = "Close", tint = Color.White)
                 }
             }
 
-            Spacer(Modifier.height(14.dp))
-
-            // ✅ le contenu au milieu peut scroller si besoin
+            // CONTENT
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .weight(1f) // prend l’espace restant entre header et boutons
-                    .padding(horizontal = 18.dp)
+                    .weight(1f)
+                    .padding(18.dp)
             ) {
-                // TITRE + compteur
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        "Tâches à accomplir",
-                        color = TextDark,
-                        fontWeight = FontWeight.ExtraBold,
-                        style = MaterialTheme.typography.headlineSmall
-                    )
+                Text(
+                    "Minuteur définit",
+                    color = TextGray,
+                    style = MaterialTheme.typography.titleSmall
+                )
+                Text(
+                    timeText,
+                    color = TextDark,
+                    fontWeight = FontWeight.Black,
+                    style = MaterialTheme.typography.displaySmall
+                )
 
-                    Spacer(Modifier.weight(1f))
+                Spacer(Modifier.height(20.dp))
 
-                    Box(
-                        modifier = Modifier
-                            .size(36.dp)
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(PinkPrimary),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = tasks.size.toString(),
-                            color = Color.White,
-                            fontWeight = FontWeight.ExtraBold
-                        )
-                    }
-                }
+                Text(
+                    "Qu'est-ce que tu vas étudier ?",
+                    color = TextDark,
+                    fontWeight = FontWeight.Bold,
+                    style = MaterialTheme.typography.titleMedium
+                )
+                Spacer(Modifier.height(10.dp))
 
-                Spacer(Modifier.height(14.dp))
-
-                // INPUT + +
+                // INPUT
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically
@@ -187,9 +163,9 @@ fun TasksSheet(
                     }
                 }
 
-                Spacer(Modifier.height(10.dp))
+                Spacer(Modifier.height(16.dp))
 
-                // ✅ LISTE tâches : prend l’espace dispo et scroll
+                // LIST
                 if (tasks.isNotEmpty()) {
                     LazyColumn(
                         modifier = Modifier
@@ -198,60 +174,96 @@ fun TasksSheet(
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                         contentPadding = PaddingValues(bottom = 10.dp)
                     ) {
-                        itemsIndexed(tasks) { index, t ->
+                        itemsIndexed(tasks) { index, task ->
+                            var showPostpone by remember { mutableStateOf(false) }
+
+                            if (showPostpone) {
+                                PostponeDateDialog(
+                                    onConfirm = { date ->
+                                        onPostponeTask(index, date)
+                                        showPostpone = false
+                                    },
+                                    onDismiss = { showPostpone = false }
+                                )
+                            }
+
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .clip(RoundedCornerShape(14.dp))
-                                    .background(Color(0xFFF7F7F7))
+                                    .background(if (task.isDone) Color(0xFFE8F5E9) else Color(0xFFF7F7F7))
                                     .padding(horizontal = 12.dp, vertical = 10.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Text(
-                                    t,
-                                    color = TextDark,
+                                    task.title,
+                                    color = if (task.isDone) TextGray else TextDark,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis,
-                                    modifier = Modifier.weight(1f)
+                                    modifier = Modifier.weight(1f),
+                                    textDecoration = if (task.isDone) TextDecoration.LineThrough else TextDecoration.None
                                 )
-                                Text(
-                                    "Supprimer",
-                                    color = Color(0xFFD32F2F),
-                                    fontWeight = FontWeight.Bold,
-                                    modifier = Modifier.clickable { onRemoveTask(index) }
-                                )
+
+                                if (task.dueDate != null && !task.isDone) {
+                                    Text(
+                                        "📅 ${task.dueDate}",
+                                        color = PinkPrimary,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        modifier = Modifier.padding(end = 8.dp)
+                                    )
+                                }
+
+                                // Complete Icon (Gray if not done, Green if done)
+                                IconButton(
+                                    onClick = { if (!task.isDone) onCompleteTask(index) },
+                                    modifier = Modifier.size(36.dp)
+                                ) {
+                                    Icon(
+                                        Icons.Default.CheckCircle, 
+                                        contentDescription = "Done", 
+                                        tint = if (task.isDone) Color(0xFF4CAF50) else Color.LightGray
+                                    )
+                                }
+
+                                // Postpone Icon (Only if NOT done)
+                                if (!task.isDone) {
+                                    IconButton(
+                                        onClick = { showPostpone = true },
+                                        modifier = Modifier.size(36.dp)
+                                    ) {
+                                        Icon(
+                                            androidx.compose.material.icons.Icons.Default.Schedule, 
+                                            contentDescription = "Postpone", 
+                                            tint = PinkPrimary
+                                        )
+                                    }
+                                }
+
+                                // Remove
+                                IconButton(
+                                    onClick = { onRemoveTask(index) },
+                                    modifier = Modifier.size(36.dp)
+                                ) {
+                                    Icon(Icons.Default.Close, contentDescription = "Delete", tint = Color.LightGray)
+                                }
                             }
                         }
                     }
                 } else {
-                    Spacer(Modifier.height(6.dp))
+                    Spacer(Modifier.weight(1f))
                 }
 
-                // "ou"
-                Row(
+                Spacer(Modifier.height(10.dp))
+
+                // PICK FROM PLANNER
+                OutlinedButton(
+                    onClick = onPickFromPlanner,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(top = 6.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Divider(modifier = Modifier.weight(1f), color = Color(0xFFEAEAEA))
-                    Spacer(Modifier.width(10.dp))
-                    Text("ou", color = TextGray, fontWeight = FontWeight.SemiBold)
-                    Spacer(Modifier.width(10.dp))
-                    Divider(modifier = Modifier.weight(1f), color = Color(0xFFEAEAEA))
-                }
-
-                Spacer(Modifier.height(12.dp))
-
-                // choisir depuis planner
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(18.dp))
-                        .background(Color(0xFFFBEAF2))
-                        .clickable { onPickFromPlanner() }
-                        .padding(14.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                        .height(72.dp),
+                    shape = RoundedCornerShape(18.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = PinkPrimary),
+                    border = null
                 ) {
                     Icon(Icons.Default.CalendarMonth, contentDescription = null, tint = PinkPrimary)
                     Spacer(Modifier.width(10.dp))
@@ -265,44 +277,79 @@ fun TasksSheet(
                 Spacer(Modifier.height(14.dp))
             }
 
-            // ✅ bottom buttons fixés
+            // FOOTER
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 18.dp)
-                    .padding(bottom = 22.dp),
+                    .padding(horizontal = 18.dp, vertical = 16.dp),
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 OutlinedButton(
                     onClick = onCancel,
-                    modifier = Modifier
-                        .weight(0.7f)   // ✅ plus petit
-                        .height(54.dp),
+                    modifier = Modifier.weight(0.7f).height(54.dp),
                     shape = RoundedCornerShape(18.dp),
-                    colors = ButtonDefaults.outlinedButtonColors(
-                        containerColor = Color.White,
-                        contentColor = TextDark
-                    )
+                    colors = ButtonDefaults.outlinedButtonColors(containerColor = Color.White, contentColor = TextDark)
                 ) {
-                    Text("Annuler", fontWeight = FontWeight.Bold, fontSize = 16.sp,)
+                    Text("Annuler", fontWeight = FontWeight.Bold, fontSize = 16.sp)
                 }
 
                 Button(
                     onClick = onStart,
-                    modifier = Modifier
-                        .weight(1.4f)   // ✅ plus grand
-                        .height(54.dp),
+                    modifier = Modifier.weight(1.4f).height(54.dp),
                     shape = RoundedCornerShape(18.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = PinkPrimary)
                 ) {
-                    Text(
-                        text = "Démarrer ! 🚀",
-                        fontWeight = FontWeight.ExtraBold,
-                        fontSize = 20.sp,
-                        color = Color.White
-                    )                }
+                    Text("Démarrer ! 🚀", fontWeight = FontWeight.ExtraBold, fontSize = 20.sp, color = Color.White)
+                }
             }
-
         }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun PostponeDateDialog(
+    onConfirm: (String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val datePickerState = rememberDatePickerState(
+        initialSelectedDateMillis = System.currentTimeMillis() + 86_400_000L
+    )
+
+    DatePickerDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = {
+            val selectedMillis = datePickerState.selectedDateMillis
+            val isValid = selectedMillis != null && selectedMillis > System.currentTimeMillis()
+
+            TextButton(
+                onClick = {
+                    if (isValid && selectedMillis != null) {
+                        val cal = Calendar.getInstance().apply { timeInMillis = selectedMillis }
+                        val date = "%04d-%02d-%02d".format(
+                            cal.get(Calendar.YEAR),
+                            cal.get(Calendar.MONTH) + 1,
+                            cal.get(Calendar.DAY_OF_MONTH)
+                        )
+                        onConfirm(date)
+                    }
+                },
+                enabled = isValid
+            ) { Text("Confirmer", color = PinkPrimary, fontWeight = FontWeight.Bold) }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Annuler", color = TextGray) }
+        }
+    ) {
+        DatePicker(
+            state = datePickerState,
+            title = {
+                Text(
+                    "Reporter au...",
+                    modifier = Modifier.padding(start = 24.dp, top = 16.dp),
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        )
     }
 }

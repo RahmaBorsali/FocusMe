@@ -8,6 +8,8 @@ import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 
+import com.example.focusme.data.api.FocusMeApiService
+
 object ApiClient {
 
     fun createRetrofit(context: Context): Retrofit {
@@ -43,4 +45,7 @@ object ApiClient {
 
     fun friendsApi(context: Context): FriendsApi =
         createRetrofit(context).create(FriendsApi::class.java)
+
+    fun socialApi(context: Context): FocusMeApiService =
+        createRetrofit(context).create(FocusMeApiService::class.java)
 }

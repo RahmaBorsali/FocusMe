@@ -21,6 +21,7 @@ class AuthRepository(context: Context) {
         safeCall {
             val res = api.login(LoginRequest(email, password))
             tokenStore.saveToken(res.accessToken)
+            tokenStore.saveUserId(res.user.id)
             res.user
         }
 

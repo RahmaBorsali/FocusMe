@@ -1,11 +1,12 @@
 package com.example.focusme.presentation.screen.planner
 
 import android.app.Application
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.*
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Shadow
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ChevronLeft
@@ -13,6 +14,7 @@ import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -82,9 +84,11 @@ fun PlannerScreen(
                 .padding(padding)
                 .fillMaxSize()
                 .background(AppBg)
-                .padding(horizontal = 18.dp, vertical = 14.dp)
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 18.dp, vertical = 20.dp)
         ) {
-            Spacer(Modifier.height(6.dp))
+            Spacer(Modifier.height(4.dp))
+
 
             // Top bar
             Row(
@@ -109,8 +113,15 @@ fun PlannerScreen(
                         text = "Plan du jour",
                         color = TextDark,
                         fontWeight = FontWeight.ExtraBold,
-                        style = MaterialTheme.typography.headlineMedium
+                        style = MaterialTheme.typography.headlineMedium.copy(
+                            shadow = Shadow(
+                                color = Color.Black.copy(alpha = 0.05f),
+                                offset = Offset(0f, 4f),
+                                blurRadius = 8f
+                            )
+                        )
                     )
+
                     Text(
                         text = "Organisez vos tâches",
                         color = TextGray,
@@ -123,11 +134,13 @@ fun PlannerScreen(
 
             // Calendar card
             Surface(
-                shape = RoundedCornerShape(22.dp),
+                shape = RoundedCornerShape(24.dp),
                 color = Color.White,
-                shadowElevation = 6.dp,
+                shadowElevation = 0.dp,
+                border = BorderStroke(1.dp, PinkPrimary.copy(alpha = 0.1f)),
                 modifier = Modifier.fillMaxWidth()
             ) {
+
                 Column(modifier = Modifier.padding(16.dp)) {
 
                     // Month header
@@ -206,19 +219,29 @@ fun PlannerScreen(
                                         ) {
                                             Box(
                                                 modifier = Modifier
-                                                    .size(38.dp)
+                                                    .size(40.dp)
                                                     .clip(CircleShape)
-                                                    .background(if (isSelected) PinkPrimary else Color.Transparent)
+                                                    .then(
+                                                        if (isSelected) {
+                                                            Modifier.background(
+                                                                Brush.linearGradient(
+                                                                    colors = listOf(PinkPrimary, Color(0xFFFF70A6))
+                                                                )
+                                                            )
+                                                        } else Modifier
+                                                    )
                                                     .clickable { selectedDate = date },
                                                 contentAlignment = Alignment.Center
                                             ) {
+
                                                 Text(
                                                     text = day.toString(),
                                                     color = if (isSelected) Color.White else TextDark,
-                                                    fontWeight = if (isSelected) FontWeight.ExtraBold else FontWeight.SemiBold
+                                                    fontWeight = if (isSelected) FontWeight.Black else FontWeight.Bold
                                                 )
                                             }
                                         }
+
                                         day++
                                     }
                                 }
@@ -286,8 +309,16 @@ fun PlannerScreen(
                             title = task.title,
                             description = task.description,
                             minutes = task.minutes,
+                            isDone = task.isDone,
                             onEdit = { onEditTask(task.id) },
-                            onDelete = { vm.askDelete(task.id) }
+                            onDelete = { vm.askDelete(task.id) },
+                            onToggleDone = { vm.completeTask(task.id, !task.isDone) },
+                            onPostpone = {
+                                val tomorrow = selectedDate.plus(1, DateTimeUnit.DAY)
+                                val tomorrowKey = dateKey(tomorrow)
+                                vm.postponeTask(task.id, tomorrowKey)
+                                scope.launch { snackbarHostState.showSnackbar("Tâche reportée à demain ✅") }
+                            }
                         )
                     }
                 }
@@ -296,18 +327,28 @@ fun PlannerScreen(
             Spacer(Modifier.weight(1f))
 
             // Add task button
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
                 Button(
                     onClick = { onAddTask(selectedDate) },
-                    shape = RoundedCornerShape(28.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = PinkPrimary),
-                    modifier = Modifier.height(56.dp)
+                    shape = RoundedCornerShape(20.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent),
+                    contentPadding = PaddingValues(0.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(64.dp)
+                        .background(
+                            brush = Brush.horizontalGradient(
+                                colors = listOf(PinkPrimary, Color(0xFFFF70A6))
+                            ),
+                            shape = RoundedCornerShape(20.dp)
+                        )
                 ) {
-                    Text("+", fontWeight = FontWeight.Black, style = MaterialTheme.typography.titleLarge, color = Color.White)
-                    Spacer(Modifier.width(10.dp))
-                    Text("Ajouter tâche", fontWeight = FontWeight.ExtraBold, color = Color.White)
+                    Text("+", fontWeight = FontWeight.Black, style = MaterialTheme.typography.headlineSmall, color = Color.White)
+                    Spacer(Modifier.width(12.dp))
+                    Text("Nouvelle Tâche", fontWeight = FontWeight.ExtraBold, style = MaterialTheme.typography.titleMedium, color = Color.White)
                 }
             }
+
 
             Spacer(Modifier.height(10.dp))
         }
@@ -338,39 +379,128 @@ private fun TaskCard(
     title: String,
     description: String,
     minutes: Int,
+    isDone: Boolean,
     onEdit: () -> Unit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    onToggleDone: () -> Unit,
+    onPostpone: () -> Unit
 ) {
     Surface(
-        shape = RoundedCornerShape(18.dp),
+        shape = RoundedCornerShape(20.dp),
         color = Color.White,
-        shadowElevation = 6.dp,
+        shadowElevation = 0.dp,
+        border = BorderStroke(1.dp, if (isDone) Color(0xFFEEEEEE).copy(alpha = 0.5f) else Color(0xFFEEEEEE)),
         modifier = Modifier.fillMaxWidth()
-
     ) {
         Row(
             modifier = Modifier.padding(14.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(title, fontWeight = FontWeight.ExtraBold, color = TextDark)
-                if (description.isNotBlank()) {
-                    Spacer(Modifier.height(4.dp))
-                    Text(description, color = TextGray)
+            // Checkbox/Completion indicator
+            IconButton(
+                onClick = onToggleDone,
+                modifier = Modifier.size(32.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(24.dp)
+                        .clip(CircleShape)
+                        .border(
+                            2.dp,
+                            if (isDone) Color(0xFF4CAF50) else PinkPrimary.copy(alpha = 0.5f),
+                            CircleShape
+                        )
+                        .background(if (isDone) Color(0xFF4CAF50) else Color.Transparent),
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (isDone) {
+                        Text("✓", color = Color.White, fontWeight = FontWeight.Black, style = MaterialTheme.typography.bodySmall)
+                    }
                 }
-                Spacer(Modifier.height(6.dp))
-                Text("$minutes min", color = TextGray, fontWeight = FontWeight.SemiBold)
             }
 
-            IconButton(onClick = onEdit) {
-                Icon(Icons.Default.Edit, contentDescription = "Edit", tint = PinkPrimary)
+            Spacer(Modifier.width(8.dp))
+
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .then(if (isDone) Modifier.padding(vertical = 4.dp) else Modifier)
+            ) {
+                Text(
+                    text = title,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = if (isDone) TextGray else TextDark,
+                    style = MaterialTheme.typography.titleMedium,
+                    textDecoration = if (isDone) androidx.compose.ui.text.style.TextDecoration.LineThrough else null
+                )
+                if (description.isNotBlank()) {
+                    Spacer(Modifier.height(2.dp))
+                    Text(
+                        text = description,
+                        color = if (isDone) TextGray.copy(alpha = 0.6f) else TextGray,
+                        style = MaterialTheme.typography.bodySmall,
+                        maxLines = 1,
+                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                    )
+                }
+                Spacer(Modifier.height(6.dp))
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(if (isDone) Color(0xFFF5F5F5) else PinkPrimary.copy(alpha = 0.08f))
+                        .padding(horizontal = 8.dp, vertical = 2.dp)
+                ) {
+                    Text(
+                        text = "$minutes min",
+                        color = if (isDone) TextGray else PinkPrimary,
+                        fontWeight = FontWeight.Bold,
+                        style = MaterialTheme.typography.labelSmall
+                    )
+                }
             }
-            IconButton(onClick = onDelete) {
-                Icon(Icons.Default.Delete, contentDescription = "Delete", tint = Color(0xFFE95B5B))
+
+            Row {
+                if (!isDone) {
+                    IconButton(
+                        onClick = onPostpone,
+                        modifier = Modifier
+                            .size(32.dp)
+                            .clip(CircleShape)
+                            .background(Color(0xFFE3F2FD))
+                    ) {
+                        Icon(
+                            androidx.compose.material.icons.Icons.Default.Schedule, 
+                            contentDescription = "Postpone", 
+                            tint = Color(0xFF2196F3), 
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                    Spacer(Modifier.width(6.dp))
+                }
+                IconButton(
+                    onClick = onEdit,
+                    modifier = Modifier
+                        .size(32.dp)
+                        .clip(CircleShape)
+                        .background(Color(0xFFF5F5F5))
+                ) {
+                    Icon(Icons.Default.Edit, contentDescription = "Edit", tint = TextDark, modifier = Modifier.size(16.dp))
+                }
+                Spacer(Modifier.width(6.dp))
+                IconButton(
+                    onClick = onDelete,
+                    modifier = Modifier
+                        .size(32.dp)
+                        .clip(CircleShape)
+                        .background(Color(0xFFFFEBEE))
+                ) {
+                    Icon(Icons.Default.Delete, contentDescription = "Delete", tint = Color(0xFFE53935), modifier = Modifier.size(16.dp))
+                }
             }
         }
     }
 }
+
 
 /* ---------------- helpers (API 24 OK) ---------------- */
 

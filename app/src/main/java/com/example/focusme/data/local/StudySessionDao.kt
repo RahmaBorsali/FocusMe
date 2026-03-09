@@ -10,7 +10,7 @@ import kotlinx.coroutines.flow.Flow
 interface StudySessionDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insert(session: StudySessionEntity)
+    suspend fun insert(session: StudySessionEntity): Long
 
     @Query("SELECT * FROM study_sessions ORDER BY createdAtMillis DESC")
     fun observeAll(): Flow<List<StudySessionEntity>>

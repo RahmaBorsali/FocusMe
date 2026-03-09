@@ -24,6 +24,8 @@ import com.example.focusme.presentation.screen.auth.SignupChoiceScreen
 import com.example.focusme.presentation.screen.auth.SignupScreen
 import com.example.focusme.presentation.screen.auth.ForgotPasswordScreen
 import com.example.focusme.presentation.screen.feed.FriendRequestsScreen
+import com.example.focusme.presentation.screen.social.LeaderboardScreen
+import com.example.focusme.presentation.screen.feed.FriendsFeedScreen
 
 @Composable
 fun AppNavGraph(navController: NavHostController) {
@@ -92,7 +94,9 @@ fun AppNavGraph(navController: NavHostController) {
         }
         composable(Routes.FEED) {
             FeedScreen(
-                onFriendRequests = { navController.navigate(Routes.FRIEND_REQUESTS) }
+                onFriendRequests = { navController.navigate(Routes.FRIEND_REQUESTS) },
+                onFriendsFeed = { navController.navigate(Routes.FRIENDS_FEED) },
+                onLeaderboard = { navController.navigate(Routes.LEADERBOARD) }
             )
         }
 
@@ -100,6 +104,16 @@ fun AppNavGraph(navController: NavHostController) {
             FriendRequestsScreen(
                 onBack = { navController.popBackStack() }
             )
+        }
+
+        composable(Routes.FRIENDS_FEED) {
+            FriendsFeedScreen(
+                onBack = { navController.popBackStack() }
+            )
+        }
+
+        composable(Routes.LEADERBOARD) {
+            LeaderboardScreen()
         }
 
         composable(Routes.MUSIC) { MusicScreen() }

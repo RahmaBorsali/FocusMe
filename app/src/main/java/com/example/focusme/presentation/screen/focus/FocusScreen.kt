@@ -1,7 +1,7 @@
 package com.example.focusme.presentation.screen.focus
 
 
-import TasksSheet
+
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -255,7 +255,7 @@ fun FocusScreen(vm: FocusViewModel = viewModel(), onOpenPlanner: () -> Unit = {}
                     Spacer(Modifier.height(14.dp))
 
                     TaskInProgressCard(
-                        taskTitle = state.sessionTasks.getOrNull(state.currentTaskIndex) ?: "",
+                        taskTitle = state.sessionTasks.getOrNull(state.currentTaskIndex)?.title ?: "",
                         onManage = { vm.openTasksSheet() } // ouvre le sheet
                     )
                 }
@@ -312,6 +312,8 @@ fun FocusScreen(vm: FocusViewModel = viewModel(), onOpenPlanner: () -> Unit = {}
                 onTaskInputChange = vm::updateTempTask,
                 onAddTask = vm::addTempTask,
                 onRemoveTask = vm::removeTask,
+                onCompleteTask = { index -> vm.completeTask(index, context) },
+                onPostponeTask = { index, date -> vm.postponeTask(index, date, context) },
                 onPickFromPlanner = onOpenPlanner,
                 onCancel = vm::closeTasksSheet,
                 onStart = {

@@ -48,4 +48,16 @@ class PlannerViewModel(app: Application) : AndroidViewModel(app) {
             _deleteId.value = null
         }
     }
+
+    fun completeTask(id: Long, isDone: Boolean) {
+        viewModelScope.launch {
+            repo.completeTask(id, isDone)
+        }
+    }
+
+    fun postponeTask(id: Long, newDateKey: String) {
+        viewModelScope.launch {
+            repo.postponeTask(id, newDateKey)
+        }
+    }
 }
