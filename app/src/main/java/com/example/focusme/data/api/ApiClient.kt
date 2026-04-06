@@ -48,4 +48,10 @@ object ApiClient {
 
     fun socialApi(context: Context): FocusMeApiService =
         createRetrofit(context).create(FocusMeApiService::class.java)
+
+    fun chatApi(context: Context): ChatApi =
+        createRetrofit(context).create(ChatApi::class.java)
+
+    fun challengesApi(context: Context): ChallengesApi =
+        createRetrofit(context).create(ChallengesApi::class.java)
 }

@@ -1,11 +1,27 @@
 package com.example.focusme.presentation.navigation
 
+import android.net.Uri
 
 object Routes {
     const val FOCUS = "focus"
     const val FEED = "feed"
     const val CHALLENGES = "challenges"
     const val CREATE_CHALLENGE = "create_challenge"
+    const val CHALLENGE_DETAILS = "challenge_details/{id}"
+    fun challengeDetailsRoute(id: String) = "challenge_details/$id"
+    const val JOIN_CHALLENGE_BY_CODE = "join_challenge_by_code"
+    const val CHALLENGE_JOIN_REQUESTS = "challenge_join_requests/{id}"
+    fun challengeJoinRequestsRoute(id: String) = "challenge_join_requests/$id"
+    const val INCOMING_JOIN_REQUESTS = "incoming_join_requests"
+    const val MY_JOIN_REQUESTS = "my_join_requests"
+    const val CHALLENGE_LEADERBOARD = "challenge_leaderboard/{id}"
+    fun challengeLeaderboardRoute(id: String) = "challenge_leaderboard/$id"
+    const val CHALLENGE_PARTICIPANTS = "challenge_participants/{id}/{myRole}"
+    fun challengeParticipantsRoute(id: String, myRole: String) = "challenge_participants/$id/$myRole"
+    const val CHALLENGE_CHAT = "challenge_chat/{id}"
+    fun challengeChatRoute(id: String) = "challenge_chat/$id"
+    const val CHALLENGE_INVITATIONS = "challenge_invitations/{id}"
+    fun challengeInvitationsRoute(id: String) = "challenge_invitations/$id"
     const val MUSIC = "music"
     const val PROFILE = "profile"
     const val PLANNER = "planner"
@@ -21,4 +37,7 @@ object Routes {
     const val FRIEND_REQUESTS = "friend_requests"
     const val FRIENDS_FEED = "friends_feed"
     const val LEADERBOARD = "leaderboard"
+    const val DIRECT_CHAT = "direct_chat/{friendId}/{friendName}/{friendUsername}"
+    fun directChatRoute(friendId: String, friendName: String, friendUsername: String) =
+        "direct_chat/${Uri.encode(friendId)}/${Uri.encode(friendName)}/${Uri.encode(friendUsername)}"
 }

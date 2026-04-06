@@ -90,6 +90,8 @@ dependencies {
     implementation(libs.gson)
     implementation(libs.media3.exoplayer)
     implementation(libs.media3.common)
+    implementation(libs.media3.session)
+    implementation(libs.media3.ui)
     implementation(libs.coil.compose)
     implementation(libs.kotlinx.coroutines.android)
 
@@ -99,6 +101,7 @@ dependencies {
     implementation(libs.androidx.datastore.preferences)
     implementation(libs.androidx.navigation.runtime.android)
     implementation(libs.androidx.navigation.compose.android)
+    implementation(libs.androidx.espresso.core)
 
 
     ksp(libs.androidx.room.compiler)

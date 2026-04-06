@@ -7,7 +7,7 @@ object MusicApiModule {
 
     private val retrofit: Retrofit by lazy {
         Retrofit.Builder()
-            .baseUrl("https://itunes.apple.com/")
+            .baseUrl("https://api.audius.co/v1/")
             .addConverterFactory(GsonConverterFactory.create())
             .build()
     }

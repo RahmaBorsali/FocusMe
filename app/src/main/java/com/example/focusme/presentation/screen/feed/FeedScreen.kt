@@ -32,6 +32,7 @@ fun FeedScreen(
     onFriendRequests: () -> Unit = {},
     onFriendsFeed: () -> Unit = {},
     onLeaderboard: () -> Unit = {},
+    onOpenChat: (UserUi) -> Unit = {},
     vm: FindFriendsViewModel = viewModel()
 ) {
     val state by vm.uiState.collectAsState()
@@ -163,6 +164,7 @@ fun FeedScreen(
                 items(friends, key = { it.id }) { f ->
                     FriendInFeedCard(
                         friend = f,
+                        onChat = { onOpenChat(f) },
                         onRemove = { friendToRemove = f }
                     )
                 }
@@ -194,6 +196,7 @@ fun FeedScreen(
 @Composable
 private fun FriendInFeedCard(
     friend: UserUi,
+    onChat: () -> Unit,
     onRemove: () -> Unit
 ) {
     Row(
@@ -220,12 +223,27 @@ private fun FriendInFeedCard(
         }
 
         // ✅ BOUTON SUPPRIMER ICI
-        TextButton(onClick = onRemove) {
-            Text(
-                "Supprimer",
-                color = Color(0xFFD32F2F),
-                fontWeight = FontWeight.Bold
-            )
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(2.dp)
+        ) {
+            IconButton(
+                onClick = onChat,
+                modifier = Modifier.size(38.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.ChatBubbleOutline,
+                    contentDescription = "Ouvrir le chat",
+                    tint = PinkPrimary
+                )
+            }
+            TextButton(onClick = onRemove) {
+                Text(
+                    "Supprimer",
+                    color = Color(0xFFD32F2F),
+                    fontWeight = FontWeight.Bold
+                )
+            }
         }
     }
 }

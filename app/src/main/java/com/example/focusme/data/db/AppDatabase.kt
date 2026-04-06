@@ -11,16 +11,17 @@ import com.example.focusme.data.local.TaskDao
         StudySessionEntity::class,
         SubjectEntity::class,
         PlannerTaskEntity::class,
-        TaskEntity::class
+        TaskEntity::class,
+        MusicTrackEntity::class
     ],
-    version = 10,
+    version = 13,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
 
     abstract fun studySessionDao(): StudySessionDao
-
     abstract fun subjectDao(): SubjectDao
     abstract fun plannerTaskDao(): PlannerTaskDao
     abstract fun taskDao(): TaskDao
+    abstract fun musicDao(): MusicDao
 }

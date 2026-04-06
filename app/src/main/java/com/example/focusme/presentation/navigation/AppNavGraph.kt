@@ -1,11 +1,20 @@
 package com.example.focusme.presentation.navigation
 
+import android.net.Uri
 import androidx.compose.runtime.Composable
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.navArgument
 import com.example.focusme.presentation.screen.challenges.ChallengesScreen
+import com.example.focusme.presentation.screen.challenges.ChallengeChatScreen
 import com.example.focusme.presentation.screen.challenges.CreateChallengeScreen
+import com.example.focusme.presentation.screen.challenges.ChallengeInvitationsScreen
+import com.example.focusme.presentation.screen.challenges.IncomingJoinRequestsScreen
+import com.example.focusme.presentation.screen.challenges.ChallengeJoinRequestsScreen
+import com.example.focusme.presentation.screen.challenges.ChallengeParticipantsScreen
+import com.example.focusme.presentation.screen.challenges.JoinChallengeByCodeScreen
+import com.example.focusme.presentation.screen.challenges.MyJoinRequestsScreen
 import com.example.focusme.presentation.screen.feed.FeedScreen
 import com.example.focusme.presentation.screen.focus.FocusScreen
 import com.example.focusme.presentation.screen.music.MusicScreen
@@ -14,7 +23,6 @@ import com.example.focusme.presentation.screen.profile.ProfileScreen
 import com.example.focusme.presentation.screen.planner.AddTaskScreen
 import kotlinx.datetime.LocalDate
 import androidx.navigation.NavType
-import androidx.navigation.navArgument
 import kotlinx.datetime.Clock
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
@@ -24,6 +32,7 @@ import com.example.focusme.presentation.screen.auth.SignupChoiceScreen
 import com.example.focusme.presentation.screen.auth.SignupScreen
 import com.example.focusme.presentation.screen.auth.ForgotPasswordScreen
 import com.example.focusme.presentation.screen.feed.FriendRequestsScreen
+import com.example.focusme.presentation.screen.feed.DirectChatScreen
 import com.example.focusme.presentation.screen.social.LeaderboardScreen
 import com.example.focusme.presentation.screen.feed.FriendsFeedScreen
 
@@ -96,7 +105,16 @@ fun AppNavGraph(navController: NavHostController) {
             FeedScreen(
                 onFriendRequests = { navController.navigate(Routes.FRIEND_REQUESTS) },
                 onFriendsFeed = { navController.navigate(Routes.FRIENDS_FEED) },
-                onLeaderboard = { navController.navigate(Routes.LEADERBOARD) }
+                onLeaderboard = { navController.navigate(Routes.LEADERBOARD) },
+                onOpenChat = { friend ->
+                    navController.navigate(
+                        Routes.directChatRoute(
+                            friendId = friend.id,
+                            friendName = friend.name,
+                            friendUsername = friend.username
+                        )
+                    )
+                }
             )
         }
 
@@ -112,6 +130,22 @@ fun AppNavGraph(navController: NavHostController) {
             )
         }
 
+        composable(
+            route = Routes.DIRECT_CHAT,
+            arguments = listOf(
+                navArgument("friendId") { type = NavType.StringType },
+                navArgument("friendName") { type = NavType.StringType },
+                navArgument("friendUsername") { type = NavType.StringType }
+            )
+        ) { backStack ->
+            DirectChatScreen(
+                friendId = Uri.decode(backStack.arguments?.getString("friendId").orEmpty()),
+                friendName = Uri.decode(backStack.arguments?.getString("friendName").orEmpty()),
+                friendUsername = Uri.decode(backStack.arguments?.getString("friendUsername").orEmpty()),
+                onBack = { navController.popBackStack() }
+            )
+        }
+
         composable(Routes.LEADERBOARD) {
             LeaderboardScreen()
         }
@@ -121,12 +155,116 @@ fun AppNavGraph(navController: NavHostController) {
 
         composable(Routes.CHALLENGES) {
             ChallengesScreen(
-                onGoCreate = { navController.navigate(Routes.CREATE_CHALLENGE) }
+                onGoCreate = { navController.navigate(Routes.CREATE_CHALLENGE) },
+                onOpenIncomingRequests = { navController.navigate(Routes.INCOMING_JOIN_REQUESTS) },
+                onOpenMyRequests = { navController.navigate(Routes.MY_JOIN_REQUESTS) },
+                onOpenDetails = { id -> navController.navigate(Routes.challengeDetailsRoute(id)) }
             )
         }
 
         composable(Routes.CREATE_CHALLENGE) {
             CreateChallengeScreen(
+                onBack = { navController.popBackStack() },
+                onCreated = { id ->
+                    navController.navigate(Routes.challengeDetailsRoute(id)) {
+                        popUpTo(Routes.CREATE_CHALLENGE) { inclusive = true }
+                    }
+                }
+            )
+        }
+
+        composable(
+            route = Routes.CHALLENGE_DETAILS,
+            arguments = listOf(navArgument("id") { type = NavType.StringType })
+        ) { backStack ->
+            val id = backStack.arguments!!.getString("id")!!
+            com.example.focusme.presentation.screen.challenges.ChallengeDetailsScreen(
+                id = id,
+                onBack = { navController.popBackStack() },
+                onOpenLeaderboard = { navController.navigate(Routes.challengeLeaderboardRoute(id)) },
+                onOpenParticipants = { myRole -> navController.navigate(Routes.challengeParticipantsRoute(id, myRole)) },
+                onOpenChat = { navController.navigate(Routes.challengeChatRoute(id)) },
+                onOpenJoinRequests = { navController.navigate(Routes.challengeJoinRequestsRoute(id)) },
+                onOpenJoinByCode = { navController.navigate(Routes.JOIN_CHALLENGE_BY_CODE) }
+            )
+        }
+
+        composable(Routes.JOIN_CHALLENGE_BY_CODE) {
+            JoinChallengeByCodeScreen(
+                onBack = { navController.popBackStack() },
+                onOpenChallenge = { id ->
+                    navController.navigate(Routes.challengeDetailsRoute(id)) {
+                        popUpTo(Routes.JOIN_CHALLENGE_BY_CODE) { inclusive = true }
+                    }
+                }
+            )
+        }
+
+        composable(
+            route = Routes.CHALLENGE_JOIN_REQUESTS,
+            arguments = listOf(navArgument("id") { type = NavType.StringType })
+        ) { backStack ->
+            ChallengeJoinRequestsScreen(
+                challengeId = backStack.arguments!!.getString("id")!!,
+                onBack = { navController.popBackStack() }
+            )
+        }
+
+        composable(Routes.MY_JOIN_REQUESTS) {
+            MyJoinRequestsScreen(
+                onBack = { navController.popBackStack() },
+                onOpenChallenge = { id -> navController.navigate(Routes.challengeDetailsRoute(id)) }
+            )
+        }
+
+        composable(Routes.INCOMING_JOIN_REQUESTS) {
+            IncomingJoinRequestsScreen(
+                onBack = { navController.popBackStack() },
+                onOpenChallenge = { id -> navController.navigate(Routes.challengeDetailsRoute(id)) }
+            )
+        }
+
+        composable(
+            route = Routes.CHALLENGE_LEADERBOARD,
+            arguments = listOf(navArgument("id") { type = NavType.StringType })
+        ) { backStack ->
+            val id = backStack.arguments!!.getString("id")!!
+            com.example.focusme.presentation.screen.challenges.ChallengeLeaderboardScreen(
+                id = id,
+                onBack = { navController.popBackStack() }
+            )
+        }
+
+        composable(
+            route = Routes.CHALLENGE_PARTICIPANTS,
+            arguments = listOf(
+                navArgument("id") { type = NavType.StringType },
+                navArgument("myRole") { type = NavType.StringType }
+            )
+        ) { backStack ->
+            ChallengeParticipantsScreen(
+                id = backStack.arguments!!.getString("id")!!,
+                myRole = backStack.arguments!!.getString("myRole"),
+                onBack = { navController.popBackStack() }
+            )
+        }
+
+        composable(
+            route = Routes.CHALLENGE_CHAT,
+            arguments = listOf(navArgument("id") { type = NavType.StringType })
+        ) { backStack ->
+            ChallengeChatScreen(
+                id = backStack.arguments!!.getString("id")!!,
+                onBack = { navController.popBackStack() }
+            )
+        }
+
+        composable(
+            route = Routes.CHALLENGE_INVITATIONS,
+            arguments = listOf(navArgument("id") { type = NavType.StringType })
+        ) { backStack ->
+            ChallengeInvitationsScreen(
+                challengeId = backStack.arguments!!.getString("id")!!,
                 onBack = { navController.popBackStack() }
             )
         }

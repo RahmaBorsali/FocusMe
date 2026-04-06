@@ -3,21 +3,25 @@ package com.example.focusme
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ListAlt
 import androidx.compose.material.icons.filled.EmojiEvents
-import androidx.compose.material.icons.filled.ListAlt
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material.icons.filled.Whatshot
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.example.focusme.presentation.navigation.AppNavGraph
 import com.example.focusme.presentation.navigation.BottomNavItem
 import com.example.focusme.presentation.navigation.Routes
+import com.example.focusme.presentation.screen.music.MusicGlobalNowPlayingBar
+import com.example.focusme.presentation.screen.music.MusicPlaybackManager
 import com.example.focusme.presentation.ui.theme.StudyFocusTheme
 import android.Manifest
 import android.content.pm.PackageManager
@@ -70,40 +74,66 @@ class MainActivity : ComponentActivity() {
 @Composable
 private fun AppRoot() {
     val navController = rememberNavController()
+    val context = LocalContext.current
 
     val items = listOf(
         BottomNavItem(Routes.FOCUS, "Minuteur", Icons.Default.Timer),
-        BottomNavItem(Routes.FEED, "Flux", Icons.Default.ListAlt),
+        BottomNavItem(Routes.FEED, "Flux", Icons.AutoMirrored.Filled.ListAlt),
         BottomNavItem(Routes.CHALLENGES, "Défis", Icons.Default.Whatshot),
-        BottomNavItem(Routes.MUSIC, "Music", Icons.Default.Headphones),
+        BottomNavItem(Routes.MUSIC, "Musique", Icons.Default.Headphones),
         BottomNavItem(Routes.PROFILE, "Profil", Icons.Default.Person)
     )
+
+    LaunchedEffect(Unit) {
+        MusicPlaybackManager.initialize(context)
+    }
 
     val navBackStackEntry = navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry.value?.destination?.route
 
-    val authRoutes = listOf(Routes.WELCOME, Routes.LOGIN, Routes.SIGNUP_CHOICE, Routes.SIGNUP, Routes.FORGOT_PASSWORD, Routes.FRIEND_REQUESTS)
+    val authRoutes = listOf(
+        Routes.WELCOME,
+        Routes.LOGIN,
+        Routes.SIGNUP_CHOICE,
+        Routes.SIGNUP,
+        Routes.FORGOT_PASSWORD,
+        Routes.FRIEND_REQUESTS,
+        Routes.DIRECT_CHAT
+    )
     val showBottomBar = currentRoute !in authRoutes
 
     Scaffold(
         bottomBar = {
             if (showBottomBar) {
-                NavigationBar {
-                    items.forEach { item ->
-                        NavigationBarItem(
-                            selected = currentRoute == item.route,
-                            onClick = {
-                                navController.navigate(item.route) {
-                                    popUpTo(navController.graph.startDestinationId) {
-                                        saveState = true
-                                    }
-                                    launchSingleTop = true
-                                    restoreState = true
+                Column {
+                    MusicGlobalNowPlayingBar(
+                        onOpenMusic = {
+                            navController.navigate(Routes.MUSIC) {
+                                popUpTo(navController.graph.startDestinationId) {
+                                    saveState = true
                                 }
-                            },
-                            icon = { Icon(item.icon, contentDescription = item.label) },
-                            label = { Text(item.label) }
-                        )
+                                launchSingleTop = true
+                                restoreState = true
+                            }
+                        }
+                    )
+                    NavigationBar {
+                        items.forEach { item ->
+                            NavigationBarItem(
+                                selected = currentRoute == item.route,
+                                onClick = {
+                                    navController.navigate(item.route) {
+                                        popUpTo(navController.graph.startDestinationId) {
+                                            saveState = true
+                                        }
+                                        launchSingleTop = true
+                                        restoreState = true
+                                    }
+                                },
+                                icon = { Icon(item.icon, contentDescription = item.label) },
+                                label = { Text(item.label) }
+                            )
+                        }
                     }
                 }
             }
