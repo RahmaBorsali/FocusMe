@@ -27,6 +27,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -57,6 +58,12 @@ fun ChallengesScreen(
 ) {
     val ui by vm.uiState.collectAsState()
     var pendingAccessChallenge by remember { mutableStateOf<Challenge?>(null) }
+
+    LaunchedEffect(Unit) {
+        if (!ui.isLoading) {
+            vm.refreshAll(isPullRefresh = true)
+        }
+    }
 
     ChallengeScreenContainer(
         title = "Defis",
@@ -116,10 +123,14 @@ fun ChallengesScreen(
                     ChallengesHomeTab.MINE -> myChallengesSection(ui.myChallenges, onOpenDetails, onGoCreate)
                     ChallengesHomeTab.FRIENDS -> friendsSection(
                         challenges = ui.friendChallenges,
+                        incomingInvitations = ui.incomingInvitations,
                         outgoingJoinRequests = ui.outgoingJoinRequests,
                         processingChallengeIds = ui.processingFriendChallengeIds,
+                        processingInvitationIds = ui.processingInvitationIds,
                         onRequestAccess = { pendingAccessChallenge = it },
                         onPrimaryAction = vm::handleFriendChallengePrimaryAction,
+                        onAcceptInvitation = { invitation -> vm.acceptInvitation(invitation, onOpenDetails) },
+                        onRejectInvitation = vm::rejectInvitation,
                         onOpen = onOpenDetails
                     )
                     ChallengesHomeTab.INVITATIONS -> invitationsSection(
@@ -149,7 +160,7 @@ fun ChallengesScreen(
         AlertDialog(
             onDismissRequest = { pendingAccessChallenge = null },
             title = { Text("Envoyer une demande ?") },
-            text = { Text("Envoyer une demande au createur de ce defi ?") },
+            text = { Text("Le createur devra ensuite accepter ou refuser ta demande d'acces a ce defi.") },
             confirmButton = {
                 PrimaryChallengeButton(
                     text = "Envoyer la demande",
@@ -198,43 +209,59 @@ private fun androidx.compose.foundation.lazy.LazyListScope.myChallengesSection(
 
 private fun androidx.compose.foundation.lazy.LazyListScope.friendsSection(
     challenges: List<Challenge>,
+    incomingInvitations: List<ChallengeInvitation>,
     outgoingJoinRequests: List<OutgoingJoinRequest>,
     processingChallengeIds: Set<String>,
+    processingInvitationIds: Set<String>,
     onRequestAccess: (Challenge) -> Unit,
     onPrimaryAction: (Challenge) -> Unit,
+    onAcceptInvitation: (ChallengeInvitation) -> Unit,
+    onRejectInvitation: (ChallengeInvitation) -> Unit,
     onOpen: (String) -> Unit
 ) {
     if (challenges.isEmpty()) {
         item { EmptyChallengesCard(title = "Tes amis n'ont pas encore lance de defi", subtitle = "Quand ils creeront un challenge, tu le verras ici.") }
         return
     }
-    val pendingRequestChallengeIds = outgoingJoinRequests
+    val pendingRequestsByChallengeId = outgoingJoinRequests
         .filter { it.status == JoinRequestStatus.PENDING }
-        .map { it.challenge.id }
-        .toSet()
+        .associateBy { it.challenge.id }
+    val incomingInvitationsByChallengeId = incomingInvitations
+        .filter { it.status.equals("pending", ignoreCase = true) }
+        .associateBy { it.challengeId }
     items(challenges, key = { it.id }) { challenge ->
+        val pendingRequest = pendingRequestsByChallengeId[challenge.id]
+        val incomingInvitation = incomingInvitationsByChallengeId[challenge.id]
         val membershipStatus = if (
             challenge.membershipStatus == MembershipStatus.NOT_JOINED &&
-            pendingRequestChallengeIds.contains(challenge.id)
+            pendingRequest != null
         ) {
             MembershipStatus.PENDING_REQUEST
         } else {
             challenge.membershipStatus
         }
+        val pendingRequestType = pendingRequest?.requestType ?: challenge.myJoinRequestType
         val isProcessing = processingChallengeIds.contains(challenge.id)
+        val isProcessingInvitation = incomingInvitation != null && processingInvitationIds.contains(incomingInvitation.id)
+        val hasIncomingInvitation =
+            membershipStatus == MembershipStatus.NOT_JOINED && incomingInvitation != null
         ChallengeCard(
             challenge = challenge,
             ctaLabel = when (membershipStatus) {
                 MembershipStatus.OWNER -> "Ton challenge"
                 MembershipStatus.JOINED -> "Ouvrir"
                 MembershipStatus.PENDING_REQUEST -> "En attente"
-                MembershipStatus.NOT_JOINED -> if (isProcessing) "Envoi..." else "Demander l'acces"
+                MembershipStatus.NOT_JOINED -> when {
+                    hasIncomingInvitation -> if (isProcessingInvitation) "Traitement..." else "Accepter l'invitation"
+                    isProcessing -> "Envoi..."
+                    else -> "Demander l'acces"
+                }
             },
             membershipLabel = when (membershipStatus) {
                 MembershipStatus.OWNER -> "Owner"
                 MembershipStatus.JOINED -> "Deja rejoint"
                 MembershipStatus.PENDING_REQUEST -> "En attente"
-                MembershipStatus.NOT_JOINED -> null
+                MembershipStatus.NOT_JOINED -> if (hasIncomingInvitation) "Invitation recue" else null
             },
             membershipTint = when (membershipStatus) {
                 MembershipStatus.OWNER -> PinkPrimary
@@ -249,8 +276,10 @@ private fun androidx.compose.foundation.lazy.LazyListScope.friendsSection(
                 MembershipStatus.NOT_JOINED -> PinkPrimary.copy(alpha = 0.10f)
             },
             supportingNote = when {
+                hasIncomingInvitation ->
+                    "${incomingInvitation?.inviterName?.ifBlank { "Un ami" } ?: "Un ami"} t'a deja envoye une invitation pour ce challenge."
                 membershipStatus == MembershipStatus.PENDING_REQUEST ->
-                    "Demande envoyee au createur. Tu restes hors du challenge jusqu'a sa reponse."
+                    "${pendingRequestType.requestLabel()} envoyee au createur. Tu restes hors du challenge jusqu'a sa reponse."
                 membershipStatus == MembershipStatus.JOINED ->
                     "Tu participes a ce challenge. Ouvre-le pour suivre ta progression."
                 membershipStatus == MembershipStatus.NOT_JOINED ->
@@ -265,26 +294,38 @@ private fun androidx.compose.foundation.lazy.LazyListScope.friendsSection(
                 MembershipStatus.OWNER -> null
                 MembershipStatus.JOINED -> { { onOpen(challenge.id) } }
                 MembershipStatus.PENDING_REQUEST -> { {} }
-                MembershipStatus.NOT_JOINED -> { { onRequestAccess(challenge) } }
+                MembershipStatus.NOT_JOINED -> {
+                    if (hasIncomingInvitation) {
+                        { onAcceptInvitation(incomingInvitation!!) }
+                    } else {
+                        { onRequestAccess(challenge) }
+                    }
+                }
             },
             primaryActionEnabled = when (membershipStatus) {
                 MembershipStatus.OWNER -> false
                 MembershipStatus.JOINED -> true
                 MembershipStatus.PENDING_REQUEST -> false
-                MembershipStatus.NOT_JOINED -> !isProcessing
+                MembershipStatus.NOT_JOINED -> if (hasIncomingInvitation) !isProcessingInvitation else !isProcessing
             },
             secondaryLabel = when (membershipStatus) {
                 MembershipStatus.OWNER -> "Voir"
                 MembershipStatus.JOINED -> if (isProcessing) "Sortie..." else "Quitter"
                 MembershipStatus.PENDING_REQUEST -> if (isProcessing) "Annulation..." else "Annuler la demande"
-                MembershipStatus.NOT_JOINED -> "Voir"
+                MembershipStatus.NOT_JOINED -> if (hasIncomingInvitation) "Refuser" else "Voir"
             },
             onClick = { onOpen(challenge.id) },
             onSecondaryClick = when (membershipStatus) {
                 MembershipStatus.OWNER -> { { onOpen(challenge.id) } }
                 MembershipStatus.JOINED,
                 MembershipStatus.PENDING_REQUEST -> { { onPrimaryAction(challenge) } }
-                MembershipStatus.NOT_JOINED -> { { onOpen(challenge.id) } }
+                MembershipStatus.NOT_JOINED -> {
+                    if (hasIncomingInvitation) {
+                        { onRejectInvitation(incomingInvitation!!) }
+                    } else {
+                        { onOpen(challenge.id) }
+                    }
+                }
             }
         )
     }
@@ -404,7 +445,7 @@ private fun InlineIncomingJoinRequestCard(
                     )
                     Spacer(Modifier.height(4.dp))
                     Text(
-                        "Veut rejoindre ${request.challenge.title}",
+                        request.requestType.ownerActionText(request.challenge.title),
                         color = TextGray,
                         style = MaterialTheme.typography.bodyMedium
                     )
@@ -465,7 +506,7 @@ private fun InlineOutgoingJoinRequestCard(
                     )
                     Spacer(Modifier.height(4.dp))
                     Text(
-                        "Owner: ${request.ownerUsername}",
+                        "${request.requestType.requestLabel()} envoyee a ${request.ownerUsername}",
                         color = TextGray,
                         style = MaterialTheme.typography.bodyMedium
                     )

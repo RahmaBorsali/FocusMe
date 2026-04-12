@@ -2,6 +2,7 @@ package com.example.focusme.presentation.screen.challenges
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -36,6 +37,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.focusme.presentation.model.UserUi
 import com.example.focusme.presentation.ui.components.SoftCard
 import com.example.focusme.presentation.ui.theme.BorderSoft
 import com.example.focusme.presentation.ui.theme.PinkPrimary
@@ -60,12 +62,27 @@ fun ChallengeInvitationsScreen(
             Spacer(Modifier.height(12.dp))
             InviteComposer(
                 value = ui.inviteeUserId,
+                selectedFriend = ui.selectedFriend,
                 isInviting = ui.isInviting,
                 error = ui.actionError,
                 onValueChange = vm::updateInviteeUserId,
                 onInvite = { vm.invite(challengeId) }
             )
             Spacer(Modifier.height(14.dp))
+            FriendSuggestionsCard(
+                friends = ui.friends,
+                query = ui.inviteeUserId,
+                selectedFriend = ui.selectedFriend,
+                onSelectFriend = vm::selectFriend
+            )
+            Spacer(Modifier.height(14.dp))
+            if (!ui.actionMessage.isNullOrBlank()) {
+                StateInfoCard(
+                    title = "Invitation envoyee",
+                    message = ui.actionMessage!!
+                )
+                Spacer(Modifier.height(14.dp))
+            }
 
             when (val state = ui.manageState) {
                 ContentState.Loading -> FullScreenLoading()
@@ -149,6 +166,7 @@ private fun CodeHelpCard() {
 @Composable
 private fun InviteComposer(
     value: String,
+    selectedFriend: UserUi?,
     isInviting: Boolean,
     error: String?,
     onValueChange: (String) -> Unit,
@@ -190,8 +208,8 @@ private fun InviteComposer(
             value = value,
             onValueChange = onValueChange,
             modifier = Modifier.fillMaxWidth(),
-            label = { Text("Identifiant de l'ami") },
-            placeholder = { Text("Ex: user_123") },
+            label = { Text("Ami a inviter") },
+            placeholder = { Text("Tape son pseudo ou choisis-le juste en dessous") },
             singleLine = true,
             colors = OutlinedTextFieldDefaults.colors(
                 focusedContainerColor = Color.White,
@@ -219,10 +237,83 @@ private fun InviteComposer(
                 .padding(horizontal = 12.dp, vertical = 10.dp)
         ) {
             Text(
-                text = error ?: "Flux separe du join request: ici, c'est toi qui proposes directement le challenge a un ami.",
+                text = error ?: if (selectedFriend != null) {
+                    "Invitation prete pour ${selectedFriend.name}. L'app enverra le vrai identifiant backend de cet ami."
+                } else {
+                    "Choisis un ami de ta liste pour que l'app envoie le bon identifiant backend."
+                },
                 color = if (error != null) MaterialTheme.colorScheme.error else TextGray,
                 style = MaterialTheme.typography.bodySmall
             )
+        }
+    }
+}
+
+@Composable
+private fun FriendSuggestionsCard(
+    friends: List<UserUi>,
+    query: String,
+    selectedFriend: UserUi?,
+    onSelectFriend: (UserUi) -> Unit
+) {
+    val normalizedQuery = query.trim().lowercase()
+    val visibleFriends = if (normalizedQuery.isBlank()) {
+        friends.take(6)
+    } else {
+        friends.filter { friend ->
+            friend.name.lowercase().contains(normalizedQuery) ||
+                friend.username.lowercase().contains(normalizedQuery) ||
+                friend.id.lowercase().contains(normalizedQuery)
+        }.take(6)
+    }
+
+    if (visibleFriends.isEmpty()) return
+
+    SoftCard(modifier = Modifier.fillMaxWidth()) {
+        Column {
+            Text(
+                text = if (selectedFriend != null) "Ami selectionne" else "Choisir un ami",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.ExtraBold
+            )
+            Spacer(Modifier.height(10.dp))
+            visibleFriends.forEach { friend ->
+                val isSelected = selectedFriend?.id == friend.id
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(if (isSelected) Color(0xFFFFF1F7) else Color.White)
+                        .border(
+                            width = 1.dp,
+                            color = if (isSelected) PinkPrimary.copy(alpha = 0.35f) else BorderSoft,
+                            shape = RoundedCornerShape(16.dp)
+                        )
+                        .clickable { onSelectFriend(friend) }
+                        .padding(horizontal = 12.dp, vertical = 10.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Avatar(url = null, fallback = friend.name.take(1))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(friend.name, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
+                            Text("@${friend.username}", color = TextGray, style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
+                    Text(
+                        text = if (isSelected) "Selectionne" else "Inviter",
+                        color = PinkPrimary,
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+                Spacer(Modifier.height(8.dp))
+            }
         }
     }
 }

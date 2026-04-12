@@ -49,7 +49,7 @@ fun ChallengeJoinRequestsScreen(
 
     ChallengeScreenContainer(
         title = "Demandes d'acces",
-        subtitle = "Accepte ou refuse les demandes envoyees sans code pour ce challenge.",
+        subtitle = "Accepte ou refuse les demandes d'acces et de participation envoyees sans code pour ce challenge.",
         actions = {
             OutlinedButton(onClick = onBack) { Text("Retour") }
             IconButton(onClick = { vm.load(challengeId, refresh = true) }) {
@@ -111,6 +111,13 @@ private fun ChallengeJoinRequestCard(
                     request.username,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.ExtraBold
+                )
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    request.requestType.requestLabel(),
+                    color = PinkPrimary,
+                    style = MaterialTheme.typography.bodySmall,
+                    fontWeight = FontWeight.SemiBold
                 )
                 Spacer(Modifier.height(4.dp))
                 Text(

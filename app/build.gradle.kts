@@ -1,9 +1,24 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.ksp)
 
 }
+
+val localProperties = Properties().apply {
+    val file = rootProject.file("local.properties")
+    if (file.exists()) {
+        file.inputStream().use(::load)
+    }
+}
+
+val configuredApiBaseUrl = providers.gradleProperty("focusmeApiBaseUrl")
+    .orElse(providers.environmentVariable("FOCUSME_API_BASE_URL"))
+    .orElse(localProperties.getProperty("focusmeApiBaseUrl") ?: "")
+    .orElse("")
+    .get()
 
 android {
     namespace = "com.example.focusme"
@@ -20,6 +35,12 @@ android {
         vectorDrawables {
             useSupportLibrary = true
         }
+
+        buildConfigField(
+            "String",
+            "API_BASE_URL_OVERRIDE",
+            "\"${configuredApiBaseUrl.replace("\"", "\\\"")}\""
+        )
     }
 
     buildTypes {
@@ -46,6 +67,7 @@ android {
 
     buildFeatures {
         compose = true
+        buildConfig = true
     }
     composeOptions {
         kotlinCompilerExtensionVersion = "1.5.14"

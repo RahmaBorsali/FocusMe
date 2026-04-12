@@ -49,7 +49,7 @@ fun MyJoinRequestsScreen(
 
     ChallengeScreenContainer(
         title = "Mes demandes",
-        subtitle = "Suis les challenges entre amis ou tu attends encore la validation du proprietaire.",
+        subtitle = "Suis les demandes d'acces ou de participation qui attendent encore la validation du proprietaire.",
         actions = {
             OutlinedButton(onClick = onBack) { Text("Retour") }
             IconButton(onClick = { vm.load(refresh = true) }) {
@@ -123,6 +123,13 @@ private fun MyJoinRequestCard(
                     "Owner: ${request.ownerUsername}",
                     color = TextGray,
                     style = MaterialTheme.typography.bodyMedium
+                )
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    request.requestType.requestLabel(),
+                    color = PinkPrimary,
+                    style = MaterialTheme.typography.bodySmall,
+                    fontWeight = FontWeight.SemiBold
                 )
                 if (request.challenge.description.isNotBlank()) {
                     Spacer(Modifier.height(4.dp))

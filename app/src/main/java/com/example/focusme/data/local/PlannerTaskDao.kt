@@ -10,6 +10,9 @@ import kotlinx.coroutines.flow.Flow
 @Dao
 interface PlannerTaskDao {
 
+    @Query("SELECT * FROM planner_tasks ORDER BY dateKey DESC, startTimeMinutes ASC, id DESC")
+    fun observeAll(): Flow<List<PlannerTaskEntity>>
+
     @Query("SELECT * FROM planner_tasks WHERE dateKey = :dateKey ORDER BY startTimeMinutes ASC, id DESC")
     fun observeTasksByDate(dateKey: String): Flow<List<PlannerTaskEntity>>
 
@@ -25,6 +28,9 @@ interface PlannerTaskDao {
 
     @Update
     suspend fun update(task: PlannerTaskEntity)
+
+    @Query("DELETE FROM planner_tasks")
+    suspend fun deleteAll()
 
 
 }

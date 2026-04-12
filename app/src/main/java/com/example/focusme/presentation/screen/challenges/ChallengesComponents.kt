@@ -51,6 +51,7 @@ import com.example.focusme.data.repository.ChallengeInvitation
 import com.example.focusme.data.repository.ChallengeRole
 import com.example.focusme.data.repository.ChallengeStatus
 import com.example.focusme.data.repository.ChallengeVisibility
+import com.example.focusme.data.repository.JoinRequestType
 import com.example.focusme.data.repository.LeaderboardEntry
 import com.example.focusme.presentation.ui.components.SoftCard
 import com.example.focusme.presentation.ui.theme.AppBg
@@ -809,6 +810,16 @@ fun String?.toReadableDateTime(): String {
     return runCatching {
         OffsetDateTime.parse(this).format(DateTimeFormatter.ofPattern("dd MMM, HH:mm"))
     }.getOrElse { this }
+}
+
+fun JoinRequestType?.requestLabel(): String = when (this) {
+    JoinRequestType.REQUEST_ACCESS -> "Demande d'acces"
+    JoinRequestType.JOIN, null -> "Demande de participation"
+}
+
+fun JoinRequestType.ownerActionText(challengeTitle: String): String = when (this) {
+    JoinRequestType.REQUEST_ACCESS -> "Demande l'acces a $challengeTitle"
+    JoinRequestType.JOIN -> "Veut rejoindre $challengeTitle"
 }
 
 fun ChallengeInvitation.challengeTitle(): String = challenge?.title ?: "Challenge prive"

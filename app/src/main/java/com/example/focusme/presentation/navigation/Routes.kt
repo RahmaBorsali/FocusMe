@@ -3,6 +3,7 @@ package com.example.focusme.presentation.navigation
 import android.net.Uri
 
 object Routes {
+    const val SESSION_GATE = "session_gate"
     const val FOCUS = "focus"
     const val FEED = "feed"
     const val CHALLENGES = "challenges"
@@ -24,6 +25,10 @@ object Routes {
     fun challengeInvitationsRoute(id: String) = "challenge_invitations/$id"
     const val MUSIC = "music"
     const val PROFILE = "profile"
+    const val PROFILE_HISTORY = "profile_history"
+    const val PROFILE_STATS = "profile_stats"
+    const val PROFILE_ACHIEVEMENTS = "profile_achievements"
+    const val PROFILE_SETTINGS = "profile_settings"
     const val PLANNER = "planner"
     const val ADD_TASK = "add_task/{y}/{m}/{d}"
     const val WELCOME = "welcome"

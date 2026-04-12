@@ -30,6 +30,16 @@ enum class JoinRequestStatus {
     REJECTED
 }
 
+enum class JoinRequestType {
+    JOIN,
+    REQUEST_ACCESS
+}
+
+enum class ChallengeInviteKind {
+    INVITE,
+    JOIN_REQUEST
+}
+
 enum class MembershipStatus {
     OWNER,
     JOINED,
@@ -59,6 +69,7 @@ data class Challenge(
     val membershipStatus: MembershipStatus,
     val myJoinRequestStatus: JoinRequestStatus?,
     val myJoinRequestId: String?,
+    val myJoinRequestType: JoinRequestType?,
     val createdAt: String?,
     val updatedAt: String?,
     val myRole: ChallengeRole,
@@ -112,6 +123,8 @@ data class ChallengeMessage(
 data class ChallengeInvitation(
     val id: String,
     val challengeId: String,
+    val kind: ChallengeInviteKind,
+    val requestType: JoinRequestType?,
     val challenge: Challenge?,
     val inviterId: String?,
     val inviterName: String,
@@ -120,6 +133,7 @@ data class ChallengeInvitation(
     val inviteeName: String,
     val inviteeAvatarUrl: String?,
     val createdAt: String?,
+    val decisionAt: String?,
     val status: String
 )
 
@@ -142,6 +156,7 @@ sealed interface JoinChallengeResult {
 
     data class PendingApproval(
         val requestId: String?,
+        val requestType: JoinRequestType,
         override val membershipStatus: MembershipStatus = MembershipStatus.PENDING_REQUEST
     ) : JoinChallengeResult
 }
@@ -175,8 +190,12 @@ data class JoinRequestChallengeInfo(
 
 data class IncomingJoinRequest(
     val id: String,
+    val challengeId: String,
+    val kind: ChallengeInviteKind,
+    val requestType: JoinRequestType,
     val status: JoinRequestStatus,
     val createdAt: String?,
+    val decisionAt: String?,
     val fromUserId: String?,
     val username: String,
     val avatarUrl: String?,
@@ -185,8 +204,12 @@ data class IncomingJoinRequest(
 
 data class OutgoingJoinRequest(
     val id: String,
+    val challengeId: String,
+    val kind: ChallengeInviteKind,
+    val requestType: JoinRequestType,
     val status: JoinRequestStatus,
     val createdAt: String?,
+    val decisionAt: String?,
     val ownerId: String?,
     val ownerUsername: String,
     val ownerAvatarUrl: String?,
@@ -196,10 +219,13 @@ data class OutgoingJoinRequest(
 data class ChallengeJoinRequest(
     val id: String,
     val challengeId: String,
+    val kind: ChallengeInviteKind,
+    val requestType: JoinRequestType,
     val fromUserId: String?,
     val username: String,
     val avatarUrl: String?,
     val createdAt: String?,
+    val decisionAt: String?,
     val status: JoinRequestStatus
 )
 

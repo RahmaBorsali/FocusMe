@@ -17,9 +17,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.example.focusme.data.local.TokenStore
 import com.example.focusme.presentation.ui.theme.PinkPrimary
 import com.example.focusme.presentation.ui.theme.TextDark
 import com.example.focusme.presentation.ui.theme.TextGray
@@ -32,6 +34,8 @@ fun SessionSummaryScreen(
     onIgnore: () -> Unit,
     onSave: (title: String, focusRate: Int, satisfactionRate: Int, visibility: String, allowComments: Boolean) -> Unit
 ) {
+    val context = LocalContext.current
+    val defaults = remember(context) { TokenStore(context).getSessionBlocking() }
     val mm = sessionSeconds / 60
     val ss = sessionSeconds % 60
     val timeText = "%d:%02d".format(mm, ss)
@@ -39,8 +43,12 @@ fun SessionSummaryScreen(
     var title by remember { mutableStateOf("Étude") }
     var focusStars by remember { mutableStateOf(0) }
     var satisfactionStars by remember { mutableStateOf(0) }
-    var friends by remember { mutableStateOf(true) }
-    var comments by remember { mutableStateOf(true) }
+    var friends by remember(defaults.defaultVisibility) {
+        mutableStateOf(defaults.defaultVisibility != "private")
+    }
+    var comments by remember(defaults.defaultAllowComments) {
+        mutableStateOf(defaults.defaultAllowComments)
+    }
 
     // ✅ dialogs
     var showMissingEvalDialog by remember { mutableStateOf(false) } // cap2

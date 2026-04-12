@@ -17,6 +17,7 @@ data class ChallengeDto(
     val membershipStatus: String? = null,
     val myJoinRequestStatus: String? = null,
     val myJoinRequestId: String? = null,
+    val myJoinRequestType: String? = null,
     val createdAt: String? = null,
     val updatedAt: String? = null,
     val myRole: String? = null,
@@ -66,14 +67,19 @@ data class ChallengeUserDto(
 data class ChallengeInvitationDto(
     val id: String,
     val challengeId: String? = null,
+    val kind: String? = null,
+    val requestType: String? = null,
     val challenge: ChallengeDto? = null,
     val fromUserId: String? = null,
     val toUserId: String? = null,
+    val fromUser: ChallengeUserDto? = null,
+    val toUser: ChallengeUserDto? = null,
     val inviter: ChallengeUserDto? = null,
     val invitee: ChallengeUserDto? = null,
     val username: String? = null,
     val avatarUrl: String? = null,
     val createdAt: String? = null,
+    val decisionAt: String? = null,
     val status: String? = null
 )
 
@@ -90,7 +96,8 @@ data class CreateChallengeBody(
 )
 
 data class JoinBody(
-    val joinCode: String? = null
+    val joinCode: String? = null,
+    val requestAccess: Boolean? = null
 )
 
 data class JoinChallengeResponseDto(
@@ -98,7 +105,8 @@ data class JoinChallengeResponseDto(
     val joined: Boolean? = null,
     val status: String? = null,
     val membershipStatus: String? = null,
-    val requestId: String? = null
+    val requestId: String? = null,
+    val requestType: String? = null
 )
 
 data class LeaveChallengeResponseDto(
@@ -176,25 +184,37 @@ data class JoinRequestChallengeDto(
 
 data class IncomingJoinRequestDto(
     val id: String? = null,
+    val challengeId: String? = null,
+    val kind: String? = null,
+    val requestType: String? = null,
     val status: String? = null,
     val createdAt: String? = null,
+    val decisionAt: String? = null,
     val fromUser: ChallengeUserDto? = null,
     val challenge: JoinRequestChallengeDto? = null
 )
 
 data class OutgoingJoinRequestDto(
     val id: String? = null,
+    val challengeId: String? = null,
+    val kind: String? = null,
+    val requestType: String? = null,
     val status: String? = null,
     val createdAt: String? = null,
+    val decisionAt: String? = null,
     val owner: ChallengeUserDto? = null,
     val challenge: JoinRequestChallengeDto? = null
 )
 
 data class ChallengeJoinRequestDto(
     val id: String? = null,
+    val challengeId: String? = null,
+    val kind: String? = null,
+    val requestType: String? = null,
     val fromUserId: String? = null,
     val username: String? = null,
     val avatarUrl: String? = null,
     val createdAt: String? = null,
+    val decisionAt: String? = null,
     val status: String? = null
 )

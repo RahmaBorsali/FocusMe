@@ -14,6 +14,7 @@ import com.example.focusme.data.api.dto.CreateChallengeBody
 import com.example.focusme.data.api.dto.IncomingJoinRequestDto
 import com.example.focusme.data.api.dto.InviteCreateBody
 import com.example.focusme.data.api.dto.JoinBody
+import com.example.focusme.data.api.dto.JoinChallengeResponseDto
 import com.example.focusme.data.api.dto.JoinRequestChallengeDto
 import com.example.focusme.data.api.dto.LeaderboardRowDto
 import com.example.focusme.data.api.dto.MessageCreateBody
@@ -21,6 +22,7 @@ import com.example.focusme.data.api.dto.OutgoingJoinRequestDto
 import com.example.focusme.data.api.dto.ParticipantDto
 import com.example.focusme.data.local.TokenStore
 import retrofit2.HttpException
+import retrofit2.Response
 
 class ChallengesRepository(
     context: Context
@@ -54,6 +56,11 @@ class ChallengesRepository(
 
     suspend fun getOutgoingInvitations(): List<ChallengeInvitation> =
         api.outgoingInvitations().map { it.toInvitation() }
+
+    suspend fun getIncomingInvitationForChallenge(challengeId: String): ChallengeInvitation? =
+        getIncomingInvitations().firstOrNull { invitation ->
+            invitation.challengeId == challengeId && invitation.status.equals("pending", ignoreCase = true)
+        }
 
     suspend fun getIncomingJoinRequests(): List<IncomingJoinRequest> =
         api.incomingJoinRequests()
@@ -89,26 +96,18 @@ class ChallengesRepository(
     }
 
     suspend fun joinChallenge(id: String, code: String? = null): JoinChallengeResult {
-        val response = api.join(id, JoinBody(code?.trim()?.ifBlank { null }))
-        if (!response.isSuccessful) throw HttpException(response)
-        val body = response.body()
-        val membershipStatus = body?.membershipStatus.toMembershipStatus(
-            joined = body?.joined,
-            role = null,
-            joinRequestStatus = null
-        )
-        return if (
-            response.code() == 202 ||
-            body?.status.equals("pending_approval", ignoreCase = true) ||
-            membershipStatus == MembershipStatus.PENDING_REQUEST
-        ) {
-            JoinChallengeResult.PendingApproval(
-                requestId = body?.requestId,
-                membershipStatus = membershipStatus
+        val response = api.join(
+            id,
+            JoinBody(
+                joinCode = code?.trim()?.ifBlank { null }
             )
-        } else {
-            JoinChallengeResult.Joined(membershipStatus = membershipStatus)
-        }
+        )
+        return response.toJoinChallengeResult()
+    }
+
+    suspend fun requestAccessChallenge(id: String): JoinChallengeResult {
+        val response = api.requestAccess(id)
+        return response.toJoinChallengeResult(defaultRequestType = JoinRequestType.REQUEST_ACCESS)
     }
 
     suspend fun leaveChallenge(id: String): LeaveChallengeResult {
@@ -204,6 +203,7 @@ class ChallengesRepository(
     private fun ChallengeDto.toDomain(myRoleOverride: String? = null): Challenge {
         val goal = goal.toDomain(goalMinutes)
         val joinRequestStatus = myJoinRequestStatus.toNullableJoinRequestStatus()
+        val joinRequestType = myJoinRequestType.toNullableJoinRequestType()
         val membership = membershipStatus.toMembershipStatus(
             joined = joined,
             role = myRoleOverride ?: myRole,
@@ -226,6 +226,7 @@ class ChallengesRepository(
             membershipStatus = membership,
             myJoinRequestStatus = joinRequestStatus,
             myJoinRequestId = myJoinRequestId,
+            myJoinRequestType = joinRequestType,
             createdAt = createdAt,
             updatedAt = updatedAt,
             myRole = resolvedRole,
@@ -300,19 +301,24 @@ class ChallengesRepository(
 
     private fun ChallengeInvitationDto.toInvitation(): ChallengeInvitation {
         val nestedChallenge = challenge?.toDomain()
-        val inviterName = inviter?.username?.ifBlank { null } ?: username?.ifBlank { null } ?: "Un ami"
-        val inviterAvatar = inviter?.avatarUrl ?: avatarUrl
+        val inviterUser = fromUser ?: inviter
+        val inviteeUser = toUser ?: invitee
+        val inviterName = inviterUser?.username?.ifBlank { null } ?: username?.ifBlank { null } ?: "Un ami"
+        val inviterAvatar = inviterUser?.avatarUrl ?: avatarUrl
         return ChallengeInvitation(
             id = id,
             challengeId = challengeId ?: nestedChallenge?.id.orEmpty(),
+            kind = kind.toInviteKind(),
+            requestType = requestType.toNullableJoinRequestType(),
             challenge = nestedChallenge,
-            inviterId = fromUserId ?: inviter?.id,
+            inviterId = fromUserId ?: inviterUser?.id,
             inviterName = inviterName,
             inviterAvatarUrl = inviterAvatar,
-            inviteeId = toUserId ?: invitee?.id,
-            inviteeName = invitee?.username?.ifBlank { "" } ?: "",
-            inviteeAvatarUrl = invitee?.avatarUrl,
+            inviteeId = toUserId ?: inviteeUser?.id,
+            inviteeName = inviteeUser?.username?.ifBlank { null } ?: username?.ifBlank { "" } ?: "",
+            inviteeAvatarUrl = inviteeUser?.avatarUrl ?: avatarUrl,
             createdAt = createdAt,
+            decisionAt = decisionAt,
             status = status?.ifBlank { "pending" } ?: "pending"
         )
     }
@@ -321,8 +327,12 @@ class ChallengesRepository(
         val challengeInfo = challenge?.toJoinRequestChallengeInfo() ?: return null
         return IncomingJoinRequest(
             id = id.orEmpty(),
+            challengeId = challengeId ?: challengeInfo.id,
+            kind = kind.toInviteKind(),
+            requestType = requestType.toJoinRequestType(),
             status = status.toJoinRequestStatus(),
             createdAt = createdAt,
+            decisionAt = decisionAt,
             fromUserId = fromUser?.id,
             username = fromUser?.username?.ifBlank { "Membre Focus Me" } ?: "Membre Focus Me",
             avatarUrl = fromUser?.avatarUrl,
@@ -334,8 +344,12 @@ class ChallengesRepository(
         val challengeInfo = challenge?.toJoinRequestChallengeInfo() ?: return null
         return OutgoingJoinRequest(
             id = id.orEmpty(),
+            challengeId = challengeId ?: challengeInfo.id,
+            kind = kind.toInviteKind(),
+            requestType = requestType.toJoinRequestType(),
             status = status.toJoinRequestStatus(),
             createdAt = createdAt,
+            decisionAt = decisionAt,
             ownerId = owner?.id,
             ownerUsername = owner?.username?.ifBlank { "Owner Focus Me" } ?: "Owner Focus Me",
             ownerAvatarUrl = owner?.avatarUrl,
@@ -343,18 +357,46 @@ class ChallengesRepository(
         )
     }
 
-    private fun ChallengeJoinRequestDto.toChallengeJoinRequest(challengeId: String): ChallengeJoinRequest? =
+    private fun ChallengeJoinRequestDto.toChallengeJoinRequest(fallbackChallengeId: String): ChallengeJoinRequest? =
         id?.let {
             ChallengeJoinRequest(
                 id = it,
-                challengeId = challengeId,
+                challengeId = challengeId ?: fallbackChallengeId,
+                kind = kind.toInviteKind(),
+                requestType = requestType.toJoinRequestType(),
                 fromUserId = fromUserId,
                 username = username?.ifBlank { "Membre Focus Me" } ?: "Membre Focus Me",
                 avatarUrl = avatarUrl,
                 createdAt = createdAt,
+                decisionAt = decisionAt,
                 status = status.toJoinRequestStatus()
             )
         }
+
+    private fun Response<JoinChallengeResponseDto>.toJoinChallengeResult(
+        defaultRequestType: JoinRequestType? = null
+    ): JoinChallengeResult {
+        if (!isSuccessful) throw HttpException(this)
+        val body = body()
+        val membershipStatus = body?.membershipStatus.toMembershipStatus(
+            joined = body?.joined,
+            role = null,
+            joinRequestStatus = null
+        )
+        return if (
+            code() == 202 ||
+            body?.status.equals("pending_approval", ignoreCase = true) ||
+            membershipStatus == MembershipStatus.PENDING_REQUEST
+        ) {
+            JoinChallengeResult.PendingApproval(
+                requestId = body?.requestId,
+                requestType = body?.requestType.toNullableJoinRequestType() ?: defaultRequestType ?: JoinRequestType.JOIN,
+                membershipStatus = membershipStatus
+            )
+        } else {
+            JoinChallengeResult.Joined(membershipStatus = membershipStatus)
+        }
+    }
 
     private fun JoinRequestChallengeDto.toJoinRequestChallengeInfo(): JoinRequestChallengeInfo? {
         val requestId = id ?: return null
@@ -422,6 +464,22 @@ private fun String?.toJoinRequestStatus(): JoinRequestStatus = when (this?.lower
     "accepted" -> JoinRequestStatus.ACCEPTED
     "rejected" -> JoinRequestStatus.REJECTED
     else -> JoinRequestStatus.PENDING
+}
+
+private fun String?.toInviteKind(): ChallengeInviteKind = when (this?.lowercase()) {
+    "join_request" -> ChallengeInviteKind.JOIN_REQUEST
+    else -> ChallengeInviteKind.INVITE
+}
+
+private fun String?.toJoinRequestType(): JoinRequestType = when (this?.lowercase()) {
+    "request_access" -> JoinRequestType.REQUEST_ACCESS
+    else -> JoinRequestType.JOIN
+}
+
+private fun String?.toNullableJoinRequestType(): JoinRequestType? = when (this?.lowercase()) {
+    null, "" -> null
+    "request_access" -> JoinRequestType.REQUEST_ACCESS
+    else -> JoinRequestType.JOIN
 }
 
 private fun String?.toNullableJoinRequestStatus(): JoinRequestStatus? = when (this?.lowercase()) {

@@ -17,4 +17,7 @@ interface StudySessionDao {
 
     @Query("DELETE FROM study_sessions WHERE id = :id")
     suspend fun deleteById(id: Long)
+
+    @Query("DELETE FROM study_sessions")
+    suspend fun deleteAll()
 }

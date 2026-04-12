@@ -2,10 +2,15 @@ package com.example.focusme.presentation.navigation
 
 import android.net.Uri
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.platform.LocalContext
 import androidx.navigation.NavHostController
+import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
+import androidx.navigation.NavGraph.Companion.findStartDestination
 import com.example.focusme.presentation.screen.challenges.ChallengesScreen
 import com.example.focusme.presentation.screen.challenges.ChallengeChatScreen
 import com.example.focusme.presentation.screen.challenges.CreateChallengeScreen
@@ -20,6 +25,10 @@ import com.example.focusme.presentation.screen.focus.FocusScreen
 import com.example.focusme.presentation.screen.music.MusicScreen
 import com.example.focusme.presentation.screen.planner.PlannerScreen
 import com.example.focusme.presentation.screen.profile.ProfileScreen
+import com.example.focusme.presentation.screen.profile.ProfileAchievementsScreen
+import com.example.focusme.presentation.screen.profile.ProfileHistoryScreen
+import com.example.focusme.presentation.screen.profile.ProfileSettingsScreen
+import com.example.focusme.presentation.screen.profile.ProfileStatsScreen
 import com.example.focusme.presentation.screen.planner.AddTaskScreen
 import kotlinx.datetime.LocalDate
 import androidx.navigation.NavType
@@ -35,9 +44,15 @@ import com.example.focusme.presentation.screen.feed.FriendRequestsScreen
 import com.example.focusme.presentation.screen.feed.DirectChatScreen
 import com.example.focusme.presentation.screen.social.LeaderboardScreen
 import com.example.focusme.presentation.screen.feed.FriendsFeedScreen
+import com.example.focusme.data.local.TokenStore
+import kotlinx.coroutines.launch
 
 @Composable
 fun AppNavGraph(navController: NavHostController) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val tokenStore = remember(context) { TokenStore(context) }
+
     NavHost(
         navController = navController,
         startDestination = Routes.WELCOME
@@ -46,7 +61,17 @@ fun AppNavGraph(navController: NavHostController) {
             WelcomeScreen(
                 onStartJourney = { navController.navigate(Routes.SIGNUP_CHOICE) },
                 onHaveAccount = { navController.navigate(Routes.LOGIN) },
-                onContinueAsGuest = { navController.navigate(Routes.FOCUS) } // UI only (guest)
+                onContinueAsGuest = {
+                    scope.launch {
+                        tokenStore.setGuestMode(true)
+                        navController.navigate(Routes.FOCUS) {
+                            popUpTo(navController.graph.findStartDestination().id) {
+                                inclusive = true
+                            }
+                            launchSingleTop = true
+                        }
+                    }
+                }
             )
         }
 
@@ -269,7 +294,40 @@ fun AppNavGraph(navController: NavHostController) {
             )
         }
 
-        composable(Routes.PROFILE) { ProfileScreen() }
+        composable(Routes.PROFILE) {
+            ProfileScreen(
+                onLogout = {
+                    navController.navigate(Routes.WELCOME) {
+                        popUpTo(navController.graph.findStartDestination().id) {
+                            inclusive = true
+                        }
+                        launchSingleTop = true
+                    }
+                },
+                onOpenLogin = { navController.navigate(Routes.LOGIN) },
+                onOpenSignup = { navController.navigate(Routes.SIGNUP_CHOICE) },
+                onOpenHistory = { navController.navigate(Routes.PROFILE_HISTORY) },
+                onOpenStats = { navController.navigate(Routes.PROFILE_STATS) },
+                onOpenAchievements = { navController.navigate(Routes.PROFILE_ACHIEVEMENTS) },
+                onOpenSettings = { navController.navigate(Routes.PROFILE_SETTINGS) }
+            )
+        }
+
+        composable(Routes.PROFILE_HISTORY) {
+            ProfileHistoryScreen(onBack = { navController.popBackStack() })
+        }
+
+        composable(Routes.PROFILE_STATS) {
+            ProfileStatsScreen(onBack = { navController.popBackStack() })
+        }
+
+        composable(Routes.PROFILE_ACHIEVEMENTS) {
+            ProfileAchievementsScreen(onBack = { navController.popBackStack() })
+        }
+
+        composable(Routes.PROFILE_SETTINGS) {
+            ProfileSettingsScreen(onBack = { navController.popBackStack() })
+        }
         composable(Routes.PLANNER) {
             PlannerScreen(
                 onBack = { navController.popBackStack() },

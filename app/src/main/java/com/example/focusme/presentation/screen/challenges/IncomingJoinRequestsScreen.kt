@@ -48,7 +48,7 @@ fun IncomingJoinRequestsScreen(
 
     ChallengeScreenContainer(
         title = "Demandes recues",
-        subtitle = "Accepte ou refuse rapidement les demandes de participation envoyees a tes challenges.",
+        subtitle = "Accepte ou refuse rapidement les demandes d'acces ou de participation envoyees a tes challenges.",
         actions = {
             OutlinedButton(onClick = onBack) { Text("Retour") }
             IconButton(onClick = { vm.load(refresh = true) }) {
@@ -115,7 +115,7 @@ private fun IncomingJoinRequestCard(
                 )
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    "Veut rejoindre ${request.challenge.title}",
+                    request.requestType.ownerActionText(request.challenge.title),
                     color = TextGray,
                     style = MaterialTheme.typography.bodyMedium
                 )

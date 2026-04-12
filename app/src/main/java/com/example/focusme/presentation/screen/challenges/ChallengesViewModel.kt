@@ -14,13 +14,17 @@ import com.example.focusme.data.repository.ChallengeStatus
 import com.example.focusme.data.repository.ChallengeVisibility
 import com.example.focusme.data.repository.ChallengesRepository
 import com.example.focusme.data.repository.CreateChallengeInput
+import com.example.focusme.data.repository.FriendsRepository
 import com.example.focusme.data.repository.GoalType
 import com.example.focusme.data.repository.IncomingJoinRequest
 import com.example.focusme.data.repository.JoinChallengeResult
 import com.example.focusme.data.repository.JoinRequestStatus
+import com.example.focusme.data.repository.JoinRequestType
 import com.example.focusme.data.repository.LeaveChallengeResult
 import com.example.focusme.data.repository.MembershipStatus
 import com.example.focusme.data.repository.OutgoingJoinRequest
+import com.example.focusme.presentation.model.FriendStatus
+import com.example.focusme.presentation.model.UserUi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -55,6 +59,7 @@ data class ChallengesHomeUiState(
     val joinCodeError: String? = null,
     val isJoiningByCode: Boolean = false,
     val processingFriendChallengeIds: Set<String> = emptySet(),
+    val processingInvitationIds: Set<String> = emptySet(),
     val processingIncomingJoinRequestIds: Set<String> = emptySet(),
     val processingOutgoingJoinRequestChallengeIds: Set<String> = emptySet(),
     val friendActionMessage: String? = null,
@@ -82,7 +87,9 @@ data class ChallengeDetailsUiState(
     val actionError: String? = null,
     val hasPendingJoinRequest: Boolean = false,
     val pendingJoinRequestId: String? = null,
+    val pendingInvitation: ChallengeInvitation? = null,
     val isJoining: Boolean = false,
+    val isRespondingToInvitation: Boolean = false,
     val isCancellingRequest: Boolean = false,
     val isLeaving: Boolean = false
 )
@@ -112,8 +119,11 @@ data class ChallengeInvitationsUiState(
     val outgoingState: ContentState<List<ChallengeInvitation>> = ContentState.Loading,
     val manageState: ContentState<List<ChallengeInvitation>> = ContentState.Loading,
     val inviteeUserId: String = "",
+    val selectedFriend: UserUi? = null,
+    val friends: List<UserUi> = emptyList(),
     val isRefreshing: Boolean = false,
     val isInviting: Boolean = false,
+    val actionMessage: String? = null,
     val actionError: String? = null
 )
 
@@ -288,15 +298,13 @@ class ChallengesHomeViewModel(app: Application) : AndroidViewModel(app) {
     fun handleFriendChallengePrimaryAction(challenge: Challenge) {
         when (challenge.membershipStatus) {
             MembershipStatus.PENDING_REQUEST -> cancelPendingFriendRequest(challenge.id)
-            MembershipStatus.NOT_JOINED -> if (challenge.visibility == ChallengeVisibility.FRIENDS) {
-                requestJoinApproval(challenge.id)
-            }
+            MembershipStatus.NOT_JOINED -> requestChallengeAccess(challenge.id)
             MembershipStatus.JOINED -> leaveFriendChallenge(challenge.id)
             MembershipStatus.OWNER -> Unit
         }
     }
 
-    private fun requestJoinApproval(challengeId: String) {
+    private fun requestChallengeAccess(challengeId: String) {
         viewModelScope.launch {
             _uiState.update {
                 it.copy(
@@ -305,14 +313,14 @@ class ChallengesHomeViewModel(app: Application) : AndroidViewModel(app) {
                     globalError = null
                 )
             }
-            runCatching { repo.joinChallenge(challengeId) }
+            runCatching { repo.requestAccessChallenge(challengeId) }
                 .onSuccess { result ->
                     _uiState.update {
                         it.copy(
                             processingFriendChallengeIds = it.processingFriendChallengeIds - challengeId,
                             friendActionMessage = when (result) {
-                                is JoinChallengeResult.Joined -> "Tu as rejoint ce challenge."
-                                is JoinChallengeResult.PendingApproval -> "Demande envoyee au proprietaire du challenge."
+                                is JoinChallengeResult.Joined -> "Tu participes deja a ce challenge."
+                                is JoinChallengeResult.PendingApproval -> result.requestType.pendingApprovalMessage()
                             }
                         )
                     }
@@ -338,16 +346,12 @@ class ChallengesHomeViewModel(app: Application) : AndroidViewModel(app) {
                     globalError = null
                 )
             }
-            runCatching { repo.leaveChallenge(challengeId) }
-                .onSuccess { result ->
+            runCatching { repo.cancelMyJoinRequest(challengeId) }
+                .onSuccess {
                     _uiState.update {
                         it.copy(
                             processingFriendChallengeIds = it.processingFriendChallengeIds - challengeId,
-                            friendActionMessage = when (result) {
-                                LeaveChallengeResult.CancelledRequest -> "Demande annulee."
-                                LeaveChallengeResult.Left -> "Tu as quitte ce challenge."
-                                LeaveChallengeResult.NotJoined -> "Tu n'avais plus de demande active."
-                            }
+                            friendActionMessage = "Demande annulee."
                         )
                     }
                     refreshAll()
@@ -401,14 +405,30 @@ class ChallengesHomeViewModel(app: Application) : AndroidViewModel(app) {
         val challengeId = invitation.challengeId
         if (challengeId.isBlank()) return
         viewModelScope.launch {
+            _uiState.update {
+                it.copy(
+                    processingInvitationIds = it.processingInvitationIds + invitation.id,
+                    friendActionMessage = null,
+                    globalError = null
+                )
+            }
             runCatching {
                 repo.acceptInvitation(challengeId, invitation.id)
             }.onSuccess {
+                _uiState.update {
+                    it.copy(
+                        processingInvitationIds = it.processingInvitationIds - invitation.id,
+                        friendActionMessage = "Invitation acceptee. Tu as rejoint ${invitation.challengeTitle()}."
+                    )
+                }
                 refreshAll()
                 onOpenChallenge(challengeId)
             }.onFailure {
                 _uiState.update { state ->
-                    state.copy(globalError = it.toUserMessage())
+                    state.copy(
+                        processingInvitationIds = state.processingInvitationIds - invitation.id,
+                        globalError = it.toUserMessage()
+                    )
                 }
             }
         }
@@ -418,13 +438,29 @@ class ChallengesHomeViewModel(app: Application) : AndroidViewModel(app) {
         val challengeId = invitation.challengeId
         if (challengeId.isBlank()) return
         viewModelScope.launch {
+            _uiState.update {
+                it.copy(
+                    processingInvitationIds = it.processingInvitationIds + invitation.id,
+                    friendActionMessage = null,
+                    globalError = null
+                )
+            }
             runCatching {
                 repo.rejectInvitation(challengeId, invitation.id)
             }.onSuccess {
+                _uiState.update {
+                    it.copy(
+                        processingInvitationIds = it.processingInvitationIds - invitation.id,
+                        friendActionMessage = "Invitation refusee pour ${invitation.challengeTitle()}."
+                    )
+                }
                 refreshAll()
             }.onFailure {
                 _uiState.update { state ->
-                    state.copy(globalError = it.toUserMessage())
+                    state.copy(
+                        processingInvitationIds = state.processingInvitationIds - invitation.id,
+                        globalError = it.toUserMessage()
+                    )
                 }
             }
         }
@@ -480,7 +516,7 @@ class ChallengesHomeViewModel(app: Application) : AndroidViewModel(app) {
                     _uiState.update {
                         it.copy(
                             processingIncomingJoinRequestIds = it.processingIncomingJoinRequestIds - requestId,
-                            friendActionMessage = "Demande refusee pour ${request.challenge.title}."
+                            friendActionMessage = "${request.requestType.requestLabel()} refusee pour ${request.challenge.title}."
                         )
                     }
                     refreshAll()
@@ -512,7 +548,7 @@ class ChallengesHomeViewModel(app: Application) : AndroidViewModel(app) {
                     _uiState.update {
                         it.copy(
                             processingOutgoingJoinRequestChallengeIds = it.processingOutgoingJoinRequestChallengeIds - challengeId,
-                            friendActionMessage = "Demande annulee pour ${request.challenge.title}."
+                            friendActionMessage = "${request.requestType.requestLabel()} annulee pour ${request.challenge.title}."
                         )
                     }
                     refreshAll()
@@ -601,6 +637,7 @@ class ChallengeDetailsViewModel(app: Application) : AndroidViewModel(app) {
 
     fun load(id: String, refresh: Boolean = false) {
         viewModelScope.launch {
+            val previousInvitation = uiState.value.pendingInvitation
             _uiState.update {
                 it.copy(
                     overviewState = if (!refresh) ContentState.Loading else it.overviewState,
@@ -609,6 +646,8 @@ class ChallengeDetailsViewModel(app: Application) : AndroidViewModel(app) {
                 )
             }
             val overviewResult = runCatching { repo.getOverview(id) }
+            val pendingInvitation = runCatching { repo.getIncomingInvitationForChallenge(id) }
+                .getOrElse { previousInvitation?.takeIf { invitation -> invitation.challengeId == id } }
             overviewResult
                 .onSuccess { overview ->
                     _uiState.update {
@@ -616,7 +655,8 @@ class ChallengeDetailsViewModel(app: Application) : AndroidViewModel(app) {
                             overviewState = ContentState.Success(overview),
                             isRefreshing = false,
                             hasPendingJoinRequest = overview.challenge.membershipStatus == MembershipStatus.PENDING_REQUEST,
-                            pendingJoinRequestId = overview.challenge.myJoinRequestId
+                            pendingJoinRequestId = overview.challenge.myJoinRequestId,
+                            pendingInvitation = pendingInvitation
                         )
                     }
                 }
@@ -630,10 +670,11 @@ class ChallengeDetailsViewModel(app: Application) : AndroidViewModel(app) {
                                     isRefreshing = false,
                                     hasPendingJoinRequest = challenge.membershipStatus == MembershipStatus.PENDING_REQUEST,
                                     pendingJoinRequestId = challenge.myJoinRequestId,
+                                    pendingInvitation = pendingInvitation,
                                     actionMessage = if (
                                         challenge.membershipStatus == MembershipStatus.PENDING_REQUEST
                                     ) {
-                                        "Apercu simplifie charge. Ta demande est toujours en attente."
+                                        "Apercu simplifie charge. Ta ${challenge.myJoinRequestType.requestLabel().lowercase()} est toujours en attente."
                                     } else {
                                         it.actionMessage
                                     }
@@ -646,7 +687,8 @@ class ChallengeDetailsViewModel(app: Application) : AndroidViewModel(app) {
                                     overviewState = ContentState.Error(throwable.toUserMessage()),
                                     isRefreshing = false,
                                     hasPendingJoinRequest = false,
-                                    pendingJoinRequestId = null
+                                    pendingJoinRequestId = null,
+                                    pendingInvitation = pendingInvitation
                                 )
                             }
                         }
@@ -678,7 +720,7 @@ class ChallengeDetailsViewModel(app: Application) : AndroidViewModel(app) {
                             _uiState.update {
                                 it.copy(
                                     isJoining = false,
-                                    actionMessage = "Demande envoyee. Le proprietaire doit maintenant l'accepter.",
+                                    actionMessage = result.requestType.pendingApprovalMessage(),
                                     hasPendingJoinRequest = true,
                                     pendingJoinRequestId = result.requestId
                                 )
@@ -698,6 +740,110 @@ class ChallengeDetailsViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    fun requestAccess(id: String) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isJoining = true, actionError = null, actionMessage = null) }
+            runCatching { repo.requestAccessChallenge(id) }
+                .onSuccess { result ->
+                    when (result) {
+                        is JoinChallengeResult.Joined -> {
+                            _uiState.update {
+                                it.copy(
+                                    isJoining = false,
+                                    actionMessage = "Tu participes deja a ce challenge.",
+                                    hasPendingJoinRequest = false,
+                                    pendingJoinRequestId = null
+                                )
+                            }
+                        }
+                        is JoinChallengeResult.PendingApproval -> {
+                            _uiState.update {
+                                it.copy(
+                                    isJoining = false,
+                                    actionMessage = result.requestType.pendingApprovalMessage(),
+                                    hasPendingJoinRequest = true,
+                                    pendingJoinRequestId = result.requestId
+                                )
+                            }
+                        }
+                    }
+                    load(id, refresh = true)
+                }
+                .onFailure { throwable ->
+                    _uiState.update {
+                        it.copy(
+                            isJoining = false,
+                            actionError = throwable.toUserMessage()
+                        )
+                    }
+                }
+        }
+    }
+
+    fun acceptPendingInvitation(id: String, invitation: ChallengeInvitation) {
+        val challengeId = invitation.challengeId.ifBlank { id }
+        viewModelScope.launch {
+            _uiState.update {
+                it.copy(
+                    isRespondingToInvitation = true,
+                    actionError = null,
+                    actionMessage = null
+                )
+            }
+            runCatching { repo.acceptInvitation(challengeId, invitation.id) }
+                .onSuccess {
+                    _uiState.update {
+                        it.copy(
+                            isRespondingToInvitation = false,
+                            pendingInvitation = null,
+                            actionMessage = "Invitation acceptee. Tu as rejoint le challenge."
+                        )
+                    }
+                    load(id, refresh = true)
+                }
+                .onFailure { throwable ->
+                    _uiState.update {
+                        it.copy(
+                            isRespondingToInvitation = false,
+                            actionError = throwable.toUserMessage()
+                        )
+                    }
+                }
+        }
+    }
+
+    fun rejectPendingInvitation(id: String, invitation: ChallengeInvitation) {
+        val challengeId = invitation.challengeId.ifBlank { id }
+        viewModelScope.launch {
+            _uiState.update {
+                it.copy(
+                    isRespondingToInvitation = true,
+                    actionError = null,
+                    actionMessage = null
+                )
+            }
+            runCatching { repo.rejectInvitation(challengeId, invitation.id) }
+                .onSuccess {
+                    _uiState.update {
+                        it.copy(
+                            isRespondingToInvitation = false,
+                            pendingInvitation = null,
+                            actionMessage = "Invitation refusee."
+                        )
+                    }
+                    load(id, refresh = true)
+                }
+                .onFailure { throwable ->
+                    _uiState.update {
+                        it.copy(
+                            isRespondingToInvitation = false,
+                            actionError = throwable.toUserMessage()
+                        )
+                    }
+                }
+        }
+    }
+
     fun cancelPendingRequest(id: String) {
         viewModelScope.launch {
             _uiState.update {
@@ -707,18 +853,14 @@ class ChallengeDetailsViewModel(app: Application) : AndroidViewModel(app) {
                     actionMessage = null
                 )
             }
-            runCatching { repo.leaveChallenge(id) }
-                .onSuccess { result ->
+            runCatching { repo.cancelMyJoinRequest(id) }
+                .onSuccess {
                     _uiState.update {
                         it.copy(
                             isCancellingRequest = false,
                             hasPendingJoinRequest = false,
                             pendingJoinRequestId = null,
-                            actionMessage = when (result) {
-                                LeaveChallengeResult.CancelledRequest -> "Ta demande a ete annulee."
-                                LeaveChallengeResult.Left -> "Tu as quitte ce challenge."
-                                LeaveChallengeResult.NotJoined -> "Ta demande n'etait plus active."
-                            }
+                            actionMessage = "Ta demande a ete annulee."
                         )
                     }
                     load(id, refresh = true)
@@ -897,12 +1039,40 @@ class ChallengeChatViewModel(app: Application) : AndroidViewModel(app) {
 
 class ChallengeInvitationsViewModel(app: Application) : AndroidViewModel(app) {
     private val repo = ChallengesRepository(app)
+    private val friendsRepo = FriendsRepository(app)
 
     private val _uiState = MutableStateFlow(ChallengeInvitationsUiState())
     val uiState: StateFlow<ChallengeInvitationsUiState> = _uiState.asStateFlow()
 
+    init {
+        loadFriends()
+    }
+
     fun updateInviteeUserId(value: String) {
-        _uiState.update { it.copy(inviteeUserId = value, actionError = null) }
+        val normalized = value.trim()
+        _uiState.update { state ->
+            state.copy(
+                inviteeUserId = value,
+                selectedFriend = state.friends.firstOrNull { friend ->
+                    friend.id.equals(normalized, ignoreCase = true) ||
+                        friend.username.equals(normalized.replace(" ", "").lowercase(), ignoreCase = true) ||
+                        friend.name.equals(normalized, ignoreCase = true)
+                },
+                actionError = null,
+                actionMessage = null
+            )
+        }
+    }
+
+    fun selectFriend(friend: UserUi) {
+        _uiState.update {
+            it.copy(
+                inviteeUserId = friend.name,
+                selectedFriend = friend,
+                actionError = null,
+                actionMessage = null
+            )
+        }
     }
 
     fun loadInbox(refresh: Boolean = false) {
@@ -957,21 +1127,30 @@ class ChallengeInvitationsViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun invite(challengeId: String) {
-        val userId = uiState.value.inviteeUserId.trim()
+        val typedValue = uiState.value.inviteeUserId.trim()
+        val selectedFriend = uiState.value.selectedFriend
+        val userId = selectedFriend?.id ?: typedValue
         if (userId.isBlank()) {
-            _uiState.update { it.copy(actionError = "Entre l'identifiant d'un ami a inviter.") }
+            _uiState.update { it.copy(actionError = "Entre l'identifiant d'un ami a inviter.", actionMessage = null) }
             return
         }
         viewModelScope.launch {
-            _uiState.update { it.copy(isInviting = true, actionError = null) }
+            _uiState.update { it.copy(isInviting = true, actionError = null, actionMessage = null) }
             runCatching { repo.inviteFriend(challengeId, userId) }
-                .onSuccess {
-                    _uiState.update { it.copy(isInviting = false, inviteeUserId = "") }
+                .onSuccess { invitation ->
+                    _uiState.update {
+                        it.copy(
+                            isInviting = false,
+                            inviteeUserId = "",
+                            selectedFriend = null,
+                            actionMessage = "Invitation envoyee a ${invitation.inviteeName.ifBlank { invitation.inviteeId ?: "cet ami" }}."
+                        )
+                    }
                     loadManage(challengeId, refresh = true)
                 }
                 .onFailure { throwable ->
                     _uiState.update {
-                        it.copy(isInviting = false, actionError = throwable.toUserMessage())
+                        it.copy(isInviting = false, actionError = throwable.toUserMessage(), actionMessage = null)
                     }
                 }
         }
@@ -997,6 +1176,29 @@ class ChallengeInvitationsViewModel(app: Application) : AndroidViewModel(app) {
                 .onSuccess { loadInbox(refresh = true) }
                 .onFailure { throwable ->
                     _uiState.update { it.copy(actionError = throwable.toUserMessage()) }
+                }
+        }
+    }
+
+    private fun loadFriends() {
+        viewModelScope.launch {
+            friendsRepo.friends()
+                .onSuccess { friends ->
+                    _uiState.update {
+                        it.copy(
+                            friends = friends.map { user ->
+                                UserUi(
+                                    id = user.id,
+                                    name = user.username,
+                                    username = user.username.replace(" ", "").lowercase(),
+                                    status = FriendStatus.FRIEND
+                                )
+                            }
+                        )
+                    }
+                }
+                .onFailure { throwable ->
+                    _uiState.update { it.copy(actionError = throwable.message ?: "Impossible de charger tes amis.") }
                 }
         }
     }
@@ -1078,6 +1280,7 @@ class ChallengeJoinRequestsViewModel(app: Application) : AndroidViewModel(app) {
                 }
         }
     }
+
 }
 
 class IncomingJoinRequestsViewModel(app: Application) : AndroidViewModel(app) {
@@ -1209,7 +1412,7 @@ class MyJoinRequestsViewModel(app: Application) : AndroidViewModel(app) {
                     _uiState.update {
                         it.copy(
                             processingChallengeIds = it.processingChallengeIds - challengeId,
-                            actionMessage = "Demande annulee."
+                            actionMessage = "${request.requestType.requestLabel()} annulee."
                         )
                     }
                     load(refresh = true)
@@ -1358,13 +1561,21 @@ class JoinByCodeViewModel(app: Application) : AndroidViewModel(app) {
 }
 
 private fun Throwable.toUserMessage(): String = when (this) {
-    is HttpException -> when (code()) {
-        400 -> "La requete n'a pas pu etre traitee."
-        401 -> "Ta session a expire. Reconnecte-toi."
-        403 -> "Cette action n'est pas autorisee."
-        404 -> "Challenge introuvable."
-        409 -> "Cette action est deja en cours ou impossible."
-        else -> "Une erreur est survenue. Reessaie."
+    is HttpException -> when (backendErrorCode()) {
+        "INVALID_ID" -> "Le backend attend le vrai identifiant technique de l'ami. Choisis ton ami dans la liste au lieu de taper son pseudo."
+        "CANNOT_INVITE_SELF" -> "Tu ne peux pas t'inviter toi-meme."
+        "USER_NOT_FOUND" -> "Aucun ami correspondant n'a ete trouve."
+        "NOT_FRIEND" -> "Cette personne doit etre ton ami avant de recevoir une invitation."
+        "ALREADY_PARTICIPANT" -> "Cet ami participe deja a ce challenge."
+        "CHALLENGE_FULL" -> "Le challenge a atteint sa limite de participants."
+        else -> when (code()) {
+            400 -> "La requete n'a pas pu etre traitee."
+            401 -> "Ta session a expire. Reconnecte-toi."
+            403 -> "Cette action n'est pas autorisee."
+            404 -> "Challenge introuvable."
+            409 -> "Cette action est deja en cours ou impossible."
+            else -> "Une erreur est survenue. Reessaie."
+        }
     }
     else -> message ?: "Une erreur reseau est survenue."
 }
@@ -1400,6 +1611,22 @@ private fun Throwable.toJoinByCodeJoinError(): Pair<String, String> = when (this
     }
     else -> "Connexion impossible" to (message ?: "Verifie ta connexion puis reessaie.")
 }
+
+private fun JoinRequestType.pendingApprovalMessage(): String = when (this) {
+    JoinRequestType.REQUEST_ACCESS -> "Demande d'acces envoyee. Le proprietaire doit maintenant l'accepter ou la refuser."
+    JoinRequestType.JOIN -> "Demande de participation envoyee. Le proprietaire doit maintenant l'accepter ou la refuser."
+}
+
+private fun HttpException.backendErrorCode(): String? =
+    response()
+        ?.errorBody()
+        ?.string()
+        ?.let { body ->
+            Regex("\"error\"\\s*:\\s*\"([^\"]+)\"")
+                .find(body)
+                ?.groupValues
+                ?.getOrNull(1)
+        }
 
 private fun MutableStateFlow<CreateChallengeUiState>.updateField(
     key: String,

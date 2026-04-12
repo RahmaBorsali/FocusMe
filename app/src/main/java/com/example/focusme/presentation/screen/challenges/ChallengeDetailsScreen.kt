@@ -35,6 +35,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.AnnotatedString
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.focusme.data.repository.ChallengeInvitation
 import com.example.focusme.data.repository.ChallengeOverview
 import com.example.focusme.data.repository.ChallengeVisibility
 import com.example.focusme.data.repository.MembershipStatus
@@ -76,10 +77,12 @@ fun ChallengeDetailsScreen(
             is ContentState.Error -> ErrorCard(message = state.message, onRetry = { vm.load(id) })
             is ContentState.Success -> ChallengeDetailsContent(
                 overview = state.data,
+                pendingInvitation = ui.pendingInvitation,
                 actionMessage = ui.actionMessage,
                 actionError = ui.actionError,
                 onCancelPendingRequest = { vm.cancelPendingRequest(id) },
-                onJoinDirect = { vm.join(id) },
+                onAcceptInvitation = { invitation -> vm.acceptPendingInvitation(id, invitation) },
+                onRejectInvitation = { invitation -> vm.rejectPendingInvitation(id, invitation) },
                 onRequestJoin = { showRequestDialog = true },
                 onLeave = { vm.leave(id, onBack) },
                 onOpenJoinByCode = onOpenJoinByCode,
@@ -105,6 +108,7 @@ fun ChallengeDetailsScreen(
                 },
                 codeFeedback = codeFeedback,
                 loadingJoin = ui.isJoining,
+                loadingInvitationResponse = ui.isRespondingToInvitation,
                 loadingCancelRequest = ui.isCancellingRequest,
                 loadingLeave = ui.isLeaving
             )
@@ -115,10 +119,10 @@ fun ChallengeDetailsScreen(
         AlertDialog(
             onDismissRequest = { showRequestDialog = false },
             title = { Text("Envoyer une demande ?") },
-            text = { Text("Envoyer une demande au createur de ce defi ?") },
+            text = { Text("Le createur devra ensuite accepter ou refuser ta demande d'acces a ce defi.") },
             confirmButton = {
                 PrimaryChallengeButton(text = "Envoyer la demande") {
-                    vm.join(id)
+                    vm.requestAccess(id)
                     showRequestDialog = false
                 }
             },
@@ -130,10 +134,12 @@ fun ChallengeDetailsScreen(
 @Composable
 private fun ChallengeDetailsContent(
     overview: ChallengeOverview,
+    pendingInvitation: ChallengeInvitation?,
     actionMessage: String?,
     actionError: String?,
     onCancelPendingRequest: () -> Unit,
-    onJoinDirect: () -> Unit,
+    onAcceptInvitation: (ChallengeInvitation) -> Unit,
+    onRejectInvitation: (ChallengeInvitation) -> Unit,
     onRequestJoin: () -> Unit,
     onLeave: () -> Unit,
     onOpenJoinByCode: () -> Unit,
@@ -145,10 +151,13 @@ private fun ChallengeDetailsContent(
     onShareCode: (String, String) -> Unit,
     codeFeedback: String?,
     loadingJoin: Boolean,
+    loadingInvitationResponse: Boolean,
     loadingCancelRequest: Boolean,
     loadingLeave: Boolean
 ) {
     val membershipStatus = overview.challenge.membershipStatus
+    val hasPendingInvitation =
+        membershipStatus == MembershipStatus.NOT_JOINED && pendingInvitation != null
     val canAccessMemberExperience =
         membershipStatus == MembershipStatus.OWNER || membershipStatus == MembershipStatus.JOINED
 
@@ -161,9 +170,8 @@ private fun ChallengeDetailsContent(
                     MembershipStatus.JOINED -> if (loadingLeave) "Sortie..." else "Quitter"
                     MembershipStatus.PENDING_REQUEST -> if (loadingCancelRequest) "Annulation..." else "Annuler la demande"
                     MembershipStatus.NOT_JOINED -> when {
+                        hasPendingInvitation -> if (loadingInvitationResponse) "Traitement..." else "Accepter l'invitation"
                         overview.challenge.visibility == ChallengeVisibility.PRIVATE -> "J'ai un code"
-                        overview.challenge.visibility == ChallengeVisibility.PUBLIC ->
-                            if (loadingJoin) "Connexion..." else "Rejoindre"
                         loadingJoin -> "Envoi..."
                         else -> "Demander l'acces"
                     }
@@ -172,7 +180,7 @@ private fun ChallengeDetailsContent(
                     MembershipStatus.OWNER -> "Owner"
                     MembershipStatus.JOINED -> "Participant"
                     MembershipStatus.PENDING_REQUEST -> "En attente"
-                    MembershipStatus.NOT_JOINED -> null
+                    MembershipStatus.NOT_JOINED -> if (hasPendingInvitation) "Invitation recue" else null
                 },
                 membershipTint = when (membershipStatus) {
                     MembershipStatus.JOINED -> androidx.compose.ui.graphics.Color(0xFF299764)
@@ -188,24 +196,25 @@ private fun ChallengeDetailsContent(
                     MembershipStatus.PENDING_REQUEST -> { { onCancelPendingRequest() } }
                     MembershipStatus.NOT_JOINED -> {
                         {
-                            when (overview.challenge.visibility) {
-                                ChallengeVisibility.PRIVATE -> onOpenJoinByCode()
-                                ChallengeVisibility.PUBLIC -> onJoinDirect()
-                                ChallengeVisibility.FRIENDS -> onRequestJoin()
+                            when {
+                                hasPendingInvitation -> onAcceptInvitation(pendingInvitation!!)
+                                overview.challenge.visibility == ChallengeVisibility.PRIVATE -> onOpenJoinByCode()
+                                else -> onRequestJoin()
                             }
                         }
                     }
                 },
                 primaryActionEnabled = membershipStatus != MembershipStatus.OWNER &&
                     !loadingJoin &&
+                    !loadingInvitationResponse &&
                     !loadingLeave &&
                     !loadingCancelRequest,
                 secondaryLabel = when (membershipStatus) {
                     MembershipStatus.OWNER,
                     MembershipStatus.JOINED -> "Classement"
                     MembershipStatus.PENDING_REQUEST -> "J'ai un code"
-                    MembershipStatus.NOT_JOINED -> if (overview.challenge.visibility == ChallengeVisibility.PUBLIC) {
-                        null
+                    MembershipStatus.NOT_JOINED -> if (hasPendingInvitation) {
+                        "Refuser"
                     } else if (overview.challenge.visibility == ChallengeVisibility.PRIVATE) {
                         null
                     } else {
@@ -217,8 +226,8 @@ private fun ChallengeDetailsContent(
                     MembershipStatus.OWNER,
                     MembershipStatus.JOINED -> onOpenLeaderboard
                     MembershipStatus.PENDING_REQUEST -> onOpenJoinByCode
-                    MembershipStatus.NOT_JOINED -> if (overview.challenge.visibility == ChallengeVisibility.PUBLIC) {
-                        null
+                    MembershipStatus.NOT_JOINED -> if (hasPendingInvitation) {
+                        { onRejectInvitation(pendingInvitation!!) }
                     } else if (overview.challenge.visibility == ChallengeVisibility.PRIVATE) {
                         null
                     } else {
@@ -240,11 +249,23 @@ private fun ChallengeDetailsContent(
             item {
                 StateInfoCard(
                     title = "Validation en attente",
-                    message = "Ta demande a bien ete envoyee. Le proprietaire du challenge doit maintenant l'accepter, ou tu peux encore l'annuler."
+                    message = "Ta ${overview.challenge.myJoinRequestType.requestLabel().lowercase()} a bien ete envoyee. Le proprietaire du challenge doit maintenant l'accepter ou la refuser, ou tu peux encore l'annuler."
                 )
             }
         }
-        if (membershipStatus == MembershipStatus.NOT_JOINED && overview.challenge.visibility == ChallengeVisibility.FRIENDS) {
+        if (hasPendingInvitation) {
+            item {
+                StateInfoCard(
+                    title = "Invitation recue",
+                    message = "${pendingInvitation?.inviterName?.ifBlank { "Un ami" } ?: "Un ami"} t'a invite a rejoindre ce challenge. Tu peux accepter l'invitation directement ici ou la refuser."
+                )
+            }
+        }
+        if (
+            membershipStatus == MembershipStatus.NOT_JOINED &&
+            !hasPendingInvitation &&
+            overview.challenge.visibility != ChallengeVisibility.PRIVATE
+        ) {
             item {
                 StateInfoCard(
                     title = "Comment rejoindre ce defi",

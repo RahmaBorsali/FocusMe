@@ -53,17 +53,26 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import com.example.focusme.data.local.TokenStore
 
 @Composable
 fun FocusScreen(vm: FocusViewModel = viewModel(), onOpenPlanner: () -> Unit = {} ) {
     val state by vm.uiState.collectAsState()
     val context = LocalContext.current
+    val tokenStore = remember(context) { TokenStore(context) }
     LaunchedEffect(state.alarmTrigger) {
         if (state.alarmTrigger != 0L) {
-            NotificationHelper.showTimerFinished(context)
-            val mp = android.media.MediaPlayer.create(context, R.raw.alarm_sound)
-            mp.setOnCompletionListener { it.release() }
-            mp.start()
+            val sessionPrefs = tokenStore.getSessionBlocking()
+
+            if (sessionPrefs.notificationsEnabled) {
+                NotificationHelper.showTimerFinished(context)
+            }
+
+            if (sessionPrefs.soundEnabled) {
+                val mp = android.media.MediaPlayer.create(context, R.raw.alarm_sound)
+                mp.setOnCompletionListener { it.release() }
+                mp.start()
+            }
         }
     }
 
@@ -90,15 +99,6 @@ fun FocusScreen(vm: FocusViewModel = viewModel(), onOpenPlanner: () -> Unit = {}
 
 
     // 🔔 notif + 🔊 son
-    LaunchedEffect(state.alarmTrigger) {
-        if (state.alarmTrigger != 0L) {
-            NotificationHelper.showTimerFinished(context)
-            val mp = android.media.MediaPlayer.create(context, R.raw.alarm_sound)
-            mp.setOnCompletionListener { it.release() }
-            mp.start()
-        }
-    }
-
     val sessionActive = state.startedAtMillis != null
     val isPaused = sessionActive && !state.isRunning
 

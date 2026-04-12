@@ -90,6 +90,7 @@ private fun AppRoot() {
 
     val navBackStackEntry = navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry.value?.destination?.route
+    val isProfileRoute = currentRoute == Routes.PROFILE || currentRoute?.startsWith("profile_") == true
 
     val authRoutes = listOf(
         Routes.WELCOME,
@@ -120,7 +121,11 @@ private fun AppRoot() {
                     NavigationBar {
                         items.forEach { item ->
                             NavigationBarItem(
-                                selected = currentRoute == item.route,
+                                selected = if (item.route == Routes.PROFILE) {
+                                    isProfileRoute
+                                } else {
+                                    currentRoute == item.route
+                                },
                                 onClick = {
                                     navController.navigate(item.route) {
                                         popUpTo(navController.graph.startDestinationId) {

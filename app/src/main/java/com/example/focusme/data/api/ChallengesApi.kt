@@ -39,6 +39,9 @@ interface ChallengesApi {
     @POST("api/challenges/{id}/join")
     suspend fun join(@Path("id") id: String, @Body body: JoinBody? = null): Response<JoinChallengeResponseDto>
 
+    @POST("api/challenges/{id}/request-access")
+    suspend fun requestAccess(@Path("id") id: String): Response<JoinChallengeResponseDto>
+
     @POST("api/challenges/{id}/leave")
     suspend fun leave(@Path("id") id: String): LeaveChallengeResponseDto
 
