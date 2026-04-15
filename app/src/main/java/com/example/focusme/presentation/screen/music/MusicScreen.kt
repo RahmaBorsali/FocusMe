@@ -7,6 +7,7 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.QueueMusic
@@ -70,10 +71,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.example.focusme.data.api.TrackDto
@@ -90,10 +93,19 @@ private val musicHeaderGradient = Brush.verticalGradient(
 )
 
 @Composable
-fun MusicScreen(vm: MusicViewModel = viewModel()) {
+fun MusicScreen(
+    openPlayer: Boolean = false,
+    vm: MusicViewModel = viewModel()
+) {
     val ui by vm.uiState.collectAsState()
     val playback by MusicPlaybackManager.state.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
+
+    LaunchedEffect(openPlayer, playback.currentTrack?.trackId) {
+        if (openPlayer && playback.currentTrack != null) {
+            vm.setPlayerExpanded(true)
+        }
+    }
 
     LaunchedEffect(ui.actionMessage, ui.actionError) {
         val message = ui.actionError ?: ui.actionMessage ?: return@LaunchedEffect
@@ -193,6 +205,7 @@ fun MusicScreen(vm: MusicViewModel = viewModel()) {
 @Composable
 fun MusicGlobalNowPlayingBar(
     onOpenMusic: () -> Unit,
+    onDismiss: () -> Unit = {},
     onTogglePlay: () -> Unit = { MusicPlaybackManager.togglePlay() }
 ) {
     val playback by MusicPlaybackManager.state.collectAsState()
@@ -202,6 +215,8 @@ fun MusicGlobalNowPlayingBar(
     } else {
         0f
     }
+    var swipeOffsetX by remember(currentTrack.trackId) { mutableFloatStateOf(0f) }
+    val dismissThreshold = 140f
 
     SoftCard(
         modifier = Modifier
@@ -212,7 +227,26 @@ fun MusicGlobalNowPlayingBar(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .clickable { onOpenMusic() }
+                .graphicsLayer { translationX = swipeOffsetX }
+                .pointerInput(currentTrack.trackId) {
+                    detectHorizontalDragGestures(
+                        onDragEnd = {
+                            if (swipeOffsetX <= -dismissThreshold) {
+                                onDismiss()
+                            } else {
+                                swipeOffsetX = 0f
+                            }
+                        },
+                        onDragCancel = {
+                            swipeOffsetX = 0f
+                        }
+                    ) { _, dragAmount ->
+                        swipeOffsetX = (swipeOffsetX + dragAmount).coerceAtMost(0f)
+                        if (swipeOffsetX <= -dismissThreshold) {
+                            onDismiss()
+                        }
+                    }
+                }
         ) {
             LinearProgressIndicator(
                 progress = { progress.coerceIn(0f, 1f) },
@@ -225,23 +259,37 @@ fun MusicGlobalNowPlayingBar(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                ArtworkThumb(track = currentTrack, modifier = Modifier.size(46.dp))
-                Spacer(Modifier.width(12.dp))
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = currentTrack.trackName ?: "Lecture en cours",
-                        color = TextDark,
-                        fontWeight = FontWeight.ExtraBold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    Spacer(Modifier.height(2.dp))
-                    Text(
-                        text = currentTrack.artistName ?: "Focus Me Music",
-                        color = TextGray,
-                        style = MaterialTheme.typography.bodySmall,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
+                Row(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clickable { onOpenMusic() },
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    ArtworkThumb(track = currentTrack, modifier = Modifier.size(46.dp))
+                    Spacer(Modifier.width(12.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = currentTrack.trackName ?: "Lecture en cours",
+                            color = TextDark,
+                            fontWeight = FontWeight.ExtraBold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Spacer(Modifier.height(2.dp))
+                        Text(
+                            text = currentTrack.artistName ?: "Focus Me Music",
+                            color = TextGray,
+                            style = MaterialTheme.typography.bodySmall,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+                IconButton(onClick = onDismiss) {
+                    Icon(
+                        imageVector = Icons.Default.Close,
+                        contentDescription = "Masquer",
+                        tint = TextGray
                     )
                 }
                 IconButton(onClick = onTogglePlay) {

@@ -3,16 +3,28 @@ package com.example.focusme
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ListAlt
 import androidx.compose.material.icons.filled.EmojiEvents
+import androidx.compose.material.icons.filled.Headphones
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material.icons.filled.Whatshot
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.navigation.compose.currentBackStackEntryAsState
@@ -26,17 +38,11 @@ import com.example.focusme.presentation.ui.theme.StudyFocusTheme
 import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Build
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.material.icons.filled.Headphones
-
-
 
 class MainActivity : ComponentActivity() {
     private val requestNotifPermission =
-        registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) {
         }
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -75,6 +81,14 @@ class MainActivity : ComponentActivity() {
 private fun AppRoot() {
     val navController = rememberNavController()
     val context = LocalContext.current
+    val playback by MusicPlaybackManager.state.collectAsState()
+    var showMusicBar by remember { mutableStateOf(true) }
+
+    LaunchedEffect(playback.currentTrack?.trackId) {
+        if (playback.currentTrack != null) {
+            showMusicBar = true
+        }
+    }
 
     val items = listOf(
         BottomNavItem(Routes.FOCUS, "Minuteur", Icons.Default.Timer),
@@ -91,6 +105,7 @@ private fun AppRoot() {
     val navBackStackEntry = navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry.value?.destination?.route
     val isProfileRoute = currentRoute == Routes.PROFILE || currentRoute?.startsWith("profile_") == true
+    val isMusicRoute = currentRoute?.startsWith("music") == true
 
     val authRoutes = listOf(
         Routes.WELCOME,
@@ -107,22 +122,31 @@ private fun AppRoot() {
         bottomBar = {
             if (showBottomBar) {
                 Column {
-                    MusicGlobalNowPlayingBar(
-                        onOpenMusic = {
-                            navController.navigate(Routes.MUSIC) {
-                                popUpTo(navController.graph.startDestinationId) {
-                                    saveState = true
+                    AnimatedVisibility(
+                        visible = showMusicBar,
+                        enter = fadeIn(),
+                        exit = fadeOut()
+                    ) {
+                        MusicGlobalNowPlayingBar(
+                            onOpenMusic = {
+                                navController.navigate(Routes.musicRoute(openPlayer = true)) {
+                                    popUpTo(navController.graph.startDestinationId) {
+                                        saveState = true
+                                    }
+                                    launchSingleTop = true
+                                    restoreState = true
                                 }
-                                launchSingleTop = true
-                                restoreState = true
-                            }
-                        }
-                    )
+                            },
+                            onDismiss = { showMusicBar = false }
+                        )
+                    }
                     NavigationBar {
                         items.forEach { item ->
                             NavigationBarItem(
                                 selected = if (item.route == Routes.PROFILE) {
                                     isProfileRoute
+                                } else if (item.route == Routes.MUSIC) {
+                                    isMusicRoute
                                 } else {
                                     currentRoute == item.route
                                 },

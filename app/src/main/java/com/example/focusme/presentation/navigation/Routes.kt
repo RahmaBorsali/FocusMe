@@ -24,6 +24,9 @@ object Routes {
     const val CHALLENGE_INVITATIONS = "challenge_invitations/{id}"
     fun challengeInvitationsRoute(id: String) = "challenge_invitations/$id"
     const val MUSIC = "music"
+    const val MUSIC_DETAIL = "music?openPlayer={openPlayer}"
+    fun musicRoute(openPlayer: Boolean = false) =
+        if (openPlayer) "music?openPlayer=true" else MUSIC
     const val PROFILE = "profile"
     const val PROFILE_HISTORY = "profile_history"
     const val PROFILE_STATS = "profile_stats"

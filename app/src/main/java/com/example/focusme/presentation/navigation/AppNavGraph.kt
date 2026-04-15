@@ -175,7 +175,14 @@ fun AppNavGraph(navController: NavHostController) {
             LeaderboardScreen()
         }
 
-        composable(Routes.MUSIC) { MusicScreen() }
+        composable(
+            route = Routes.MUSIC_DETAIL,
+            arguments = listOf(navArgument("openPlayer") { type = NavType.BoolType; defaultValue = false })
+        ) { backStack ->
+            MusicScreen(
+                openPlayer = backStack.arguments?.getBoolean("openPlayer") ?: false
+            )
+        }
 
 
         composable(Routes.CHALLENGES) {
