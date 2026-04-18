@@ -148,11 +148,13 @@ data class ChallengeMessageDto(
     val username: String? = null,
     val avatarUrl: String? = null,
     val text: String? = null,
+    val attachment: AttachmentDto? = null,
     val createdAt: String? = null
 )
 
 data class MessageCreateBody(
-    val text: String
+    val text: String? = null,
+    val attachment: AttachmentDto? = null
 )
 
 data class InviteCreateBody(

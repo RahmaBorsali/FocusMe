@@ -1,6 +1,7 @@
 package com.example.focusme.data.api
 
 import com.example.focusme.data.api.dto.*
+import okhttp3.MultipartBody
 import retrofit2.Response
 import retrofit2.http.*
 
@@ -72,6 +73,10 @@ interface ChallengesApi {
         @Query("limit") limit: Int? = null,
         @Query("before") before: String? = null
     ): List<ChallengeMessageDto>
+
+    @Multipart
+    @POST("api/challenges/{id}/upload")
+    suspend fun uploadFile(@Path("id") id: String, @Part file: MultipartBody.Part): AttachmentDto
 
     @POST("api/challenges/{id}/messages")
     suspend fun sendMessage(@Path("id") id: String, @Body body: MessageCreateBody): IdResponse

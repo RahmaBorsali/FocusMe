@@ -9,6 +9,13 @@ data class ChatUser(
     val avatarUrl: String
 )
 
+data class ChatAttachment(
+    val url: String,
+    val type: String,
+    val fileName: String,
+    val fileSize: Long
+)
+
 data class ChatConversationLastMessage(
     val text: String,
     val senderId: String,
@@ -29,7 +36,8 @@ data class DirectChatMessage(
     val conversationId: String,
     val sender: ChatUser,
     val recipient: ChatUser,
-    val text: String,
+    val text: String? = null,
+    val attachment: ChatAttachment? = null,
     val createdAt: String?,
     val readAt: String?
 )

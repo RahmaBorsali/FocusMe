@@ -436,7 +436,7 @@ private fun RecentMessagesCard(overview: ChallengeOverview, onOpenChat: () -> Un
                         Spacer(Modifier.width(8.dp))
                         Column {
                             Text(message.username, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
-                            Text(message.text, color = TextGray, style = MaterialTheme.typography.bodySmall)
+                            Text(message.text ?: if (message.attachment != null) "[Pièce jointe]" else "", color = TextGray, style = MaterialTheme.typography.bodySmall)
                         }
                     }
                     Spacer(Modifier.height(8.dp))

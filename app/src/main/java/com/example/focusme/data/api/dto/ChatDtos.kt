@@ -1,5 +1,12 @@
 package com.example.focusme.data.api.dto
 
+data class AttachmentDto(
+    val url: String,
+    val type: String,
+    val fileName: String,
+    val fileSize: Long
+)
+
 data class ChatUserDto(
     val id: String,
     val username: String? = null,
@@ -34,6 +41,7 @@ data class ChatMessageDto(
     val sender: ChatUserDto? = null,
     val recipient: ChatUserDto? = null,
     val text: String? = null,
+    val attachment: AttachmentDto? = null,
     val createdAt: String? = null,
     val readAt: String? = null
 )
@@ -41,5 +49,6 @@ data class ChatMessageDto(
 data class SendChatMessageBody(
     val conversationId: String? = null,
     val targetUserId: String? = null,
-    val text: String
+    val text: String? = null,
+    val attachment: AttachmentDto? = null
 )

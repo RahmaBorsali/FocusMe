@@ -20,6 +20,12 @@ val configuredApiBaseUrl = providers.gradleProperty("focusmeApiBaseUrl")
     .orElse("")
     .get()
 
+val configuredGoogleWebClientId = providers.gradleProperty("focusmeGoogleWebClientId")
+    .orElse(providers.environmentVariable("FOCUSME_GOOGLE_WEB_CLIENT_ID"))
+    .orElse(localProperties.getProperty("focusmeGoogleWebClientId") ?: "")
+    .orElse("")
+    .get()
+
 android {
     namespace = "com.example.focusme"
     compileSdk = 35
@@ -40,6 +46,11 @@ android {
             "String",
             "API_BASE_URL_OVERRIDE",
             "\"${configuredApiBaseUrl.replace("\"", "\\\"")}\""
+        )
+        buildConfigField(
+            "String",
+            "GOOGLE_WEB_CLIENT_ID",
+            "\"${configuredGoogleWebClientId.replace("\"", "\\\"")}\""
         )
     }
 
@@ -124,6 +135,9 @@ dependencies {
     implementation(libs.androidx.navigation.runtime.android)
     implementation(libs.androidx.navigation.compose.android)
     implementation(libs.androidx.espresso.core)
+    implementation(libs.androidx.credentials)
+    implementation(libs.androidx.credentials.play.services.auth)
+    implementation(libs.googleid)
 
 
     ksp(libs.androidx.room.compiler)

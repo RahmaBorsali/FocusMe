@@ -16,13 +16,14 @@ import com.example.focusme.presentation.ui.theme.BorderSoft
 fun SoftCard(
     modifier: Modifier = Modifier,
     padding: PaddingValues = PaddingValues(16.dp),
+    containerColor: androidx.compose.ui.graphics.Color = MaterialTheme.colorScheme.surface,
     content: @Composable () -> Unit
 ) {
     val shape = RoundedCornerShape(22.dp)
     androidx.compose.foundation.layout.Box(
         modifier = modifier
             .clip(shape)
-            .background(MaterialTheme.colorScheme.surface)
+            .background(containerColor)
             .border(1.dp, BorderSoft, shape)
             .padding(padding)
     ) {

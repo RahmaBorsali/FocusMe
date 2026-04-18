@@ -111,12 +111,20 @@ data class ChallengeParticipant(
     val joinedAt: String?
 )
 
+data class ChallengeAttachment(
+    val url: String,
+    val type: String,
+    val fileName: String,
+    val fileSize: Long
+)
+
 data class ChallengeMessage(
     val id: String,
     val userId: String,
     val username: String,
     val avatarUrl: String?,
-    val text: String,
+    val text: String? = null,
+    val attachment: ChallengeAttachment? = null,
     val createdAt: String?
 )
 

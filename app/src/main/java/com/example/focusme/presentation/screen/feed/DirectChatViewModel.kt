@@ -24,6 +24,8 @@ data class DirectChatUiState(
     val state: ContentState<List<DirectChatMessage>> = ContentState.Loading,
     val composer: String = "",
     val isSending: Boolean = false,
+    val selectedFile: java.io.File? = null,
+    val isUploading: Boolean = false,
     val actionError: String? = null
 )
 
@@ -143,29 +145,42 @@ class DirectChatViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    fun selectFile(file: java.io.File) {
+        _uiState.update { it.copy(selectedFile = file, actionError = null) }
+    }
+
+    fun clearAttachment() {
+        _uiState.update { it.copy(selectedFile = null, actionError = null) }
+    }
+
     fun sendMessage() {
         val conversationId = uiState.value.conversationId ?: return
         val text = uiState.value.composer.trim()
-        if (text.isBlank()) {
-            _uiState.update { it.copy(actionError = "Ecris un message avant d'envoyer.") }
+        val file = uiState.value.selectedFile
+
+        if (text.isBlank() && file == null) {
+            _uiState.update { it.copy(actionError = "Ecris un message ou choisis un fichier.") }
             return
         }
 
         viewModelScope.launch {
-            _uiState.update { it.copy(isSending = true, actionError = null) }
-            runCatching { repo.sendMessage(conversationId, text) }
-                .onSuccess {
-                    _uiState.update { it.copy(isSending = false, composer = "") }
-                    loadMessages(refresh = true)
+            _uiState.update { it.copy(isSending = true, isUploading = file != null, actionError = null) }
+            
+            runCatching {
+                val attachment = file?.let { repo.uploadFile(it) }
+                repo.sendMessage(conversationId, text.ifBlank { null }, attachment)
+            }.onSuccess {
+                _uiState.update { it.copy(isSending = false, isUploading = false, composer = "", selectedFile = null) }
+                loadMessages(refresh = true)
+            }.onFailure { throwable ->
+                _uiState.update {
+                    it.copy(
+                        isSending = false,
+                        isUploading = false,
+                        actionError = throwable.toDirectChatMessage()
+                    )
                 }
-                .onFailure { throwable ->
-                    _uiState.update {
-                        it.copy(
-                            isSending = false,
-                            actionError = throwable.toDirectChatMessage()
-                        )
-                    }
-                }
+            }
         }
     }
 }

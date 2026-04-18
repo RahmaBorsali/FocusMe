@@ -3,6 +3,8 @@ package com.example.focusme.data.repository
 import android.content.Context
 import androidx.room.withTransaction
 import com.example.focusme.data.db.AppDatabase
+import com.example.focusme.data.api.ApiClient
+import com.example.focusme.data.api.dto.UpdateProfileRequest
 import com.example.focusme.data.local.DbProvider
 import com.example.focusme.data.local.StoredSession
 import com.example.focusme.data.local.StudySessionEntity
@@ -33,6 +35,7 @@ class ProfileRepository(context: Context) {
 
     private val database: AppDatabase = DbProvider.db(context)
     private val tokenStore = TokenStore(context)
+    private val profileApi = ApiClient.profileApi(context)
 
     fun observeProfile(): Flow<ProfileSnapshot> =
         combine(
@@ -74,7 +77,20 @@ class ProfileRepository(context: Context) {
         }
 
     suspend fun saveProfile(displayName: String, studyGoal: String) {
-        tokenStore.updateProfile(displayName = displayName, studyGoal = studyGoal)
+        if (tokenStore.getTokenBlocking().isNullOrBlank()) {
+            tokenStore.updateProfile(displayName = displayName, studyGoal = studyGoal)
+            return
+        }
+
+        val current = tokenStore.getSessionBlocking()
+        val response = profileApi.updateMe(
+            UpdateProfileRequest(
+                username = current.username.takeIf { it.isNotBlank() },
+                displayName = displayName.trim().ifBlank { null },
+                studyGoal = studyGoal.trim().ifBlank { null }
+            )
+        )
+        tokenStore.saveRemoteProfile(response)
     }
 
     suspend fun setNotificationsEnabled(enabled: Boolean) {
@@ -112,6 +128,20 @@ class ProfileRepository(context: Context) {
     }
 
     suspend fun logout() {
+        tokenStore.clear()
+    }
+
+    suspend fun refreshRemoteProfile() {
+        if (tokenStore.getTokenBlocking().isNullOrBlank()) return
+        val profile = profileApi.me()
+        tokenStore.saveRemoteProfile(profile)
+    }
+
+    suspend fun deleteAccount() {
+        if (!tokenStore.getTokenBlocking().isNullOrBlank()) {
+            profileApi.deleteMe()
+        }
+        clearAllLocalData()
         tokenStore.clear()
     }
 

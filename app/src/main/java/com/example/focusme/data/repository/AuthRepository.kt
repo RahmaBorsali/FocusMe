@@ -26,6 +26,15 @@ class AuthRepository(context: Context) {
             res.user
         }
 
+    suspend fun loginWithGoogle(idToken: String, mode: String): Result<GoogleAuthResponse> =
+        safeCall {
+            val res = api.google(GoogleAuthRequest(idToken, mode))
+            if (res.accessToken != null && res.user != null) {
+                tokenStore.saveSession(res.accessToken, res.user)
+            }
+            res
+        }
+
     suspend fun logout(): Result<Unit> =
         safeCall {
             tokenStore.clear()

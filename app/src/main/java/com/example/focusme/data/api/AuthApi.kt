@@ -11,6 +11,9 @@ interface AuthApi {
     @POST("auth/login")
     suspend fun login(@Body req: LoginRequest): LoginResponse
 
+    @POST("auth/google")
+    suspend fun google(@Body req: GoogleAuthRequest): GoogleAuthResponse
+
     @POST("auth/forgot-password")
     suspend fun forgotPassword(@Body req: ForgotPasswordRequest): Map<String, String>
 

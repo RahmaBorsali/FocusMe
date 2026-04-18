@@ -271,13 +271,21 @@ fun ProfileScreen(
                 icon = Icons.Default.DeleteOutline,
                 iconTint = Color(0xFFFF6257),
                 title = "Supprimer le compte",
-                subtitle = "Suppression definitive bientot disponible",
+                subtitle = if (ui.accountMode == ProfileAccountMode.AUTHENTICATED) {
+                    "Supprimer le compte et les donnees associees"
+                } else {
+                    "Effacer les donnees locales de cet appareil"
+                },
                 destructive = true,
                 onClick = {
-                    infoDialog = ProfileInfoDialog(
-                        title = "Suppression du compte",
-                        message = "La suppression definitive du compte cote serveur n'est pas encore connectee. En attendant, tu peux effacer toutes les donnees locales depuis cet ecran."
-                    )
+                    if (ui.accountMode == ProfileAccountMode.AUTHENTICATED) {
+                        showClearDataDialog = true
+                    } else {
+                        infoDialog = ProfileInfoDialog(
+                            title = "Suppression du compte",
+                            message = "Aucun compte serveur n'est connecte pour le moment. Tu peux effacer les donnees locales de l'app sur cet appareil."
+                        )
+                    }
                 }
             )
         }
@@ -333,14 +341,26 @@ fun ProfileScreen(
 
     if (showClearDataDialog) {
         ConfirmDialog(
-            title = "Effacer les donnees locales ?",
-            text = "Les sessions, taches, matieres et morceaux sauvegardes sur cet appareil seront supprimes.",
-            confirmLabel = "Effacer",
+            title = if (ui.accountMode == ProfileAccountMode.AUTHENTICATED) {
+                "Supprimer le compte ?"
+            } else {
+                "Effacer les donnees locales ?"
+            },
+            text = if (ui.accountMode == ProfileAccountMode.AUTHENTICATED) {
+                "Ton compte sera supprime cote serveur et les donnees locales de cet appareil seront aussi effacees."
+            } else {
+                "Les sessions, taches, matieres et morceaux sauvegardes sur cet appareil seront supprimes."
+            },
+            confirmLabel = if (ui.accountMode == ProfileAccountMode.AUTHENTICATED) "Supprimer" else "Effacer",
             confirmColor = Color(0xFFE53935),
             onDismiss = { showClearDataDialog = false },
             onConfirm = {
                 showClearDataDialog = false
-                vm.clearAllLocalData()
+                if (ui.accountMode == ProfileAccountMode.AUTHENTICATED) {
+                    vm.deleteAccount(onDone = onLogout)
+                } else {
+                    vm.clearAllLocalData()
+                }
             }
         )
     }
@@ -353,7 +373,7 @@ fun ProfileScreen(
             confirmButton = {
                 TextButton(
                     onClick = {
-                        if (infoDialog!!.title == "Suppression du compte") {
+                        if (infoDialog!!.title == "Suppression du compte" && ui.accountMode != ProfileAccountMode.AUTHENTICATED) {
                             showClearDataDialog = true
                         }
                         infoDialog = null
@@ -385,8 +405,8 @@ private fun HeroProfileCard(
     onOpenLogin: () -> Unit,
     onOpenSignup: () -> Unit
 ) {
-    val usernameLabel = remember(ui.username, ui.displayName) {
-        "@${ui.username.ifBlank { ui.displayName.lowercase(Locale.getDefault()).replace(" ", "") }}"
+    val nameLabel = remember(ui.username, ui.displayName) {
+        ui.displayName.ifBlank { ui.username }
     }
 
     Surface(
@@ -402,7 +422,7 @@ private fun HeroProfileCard(
 
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = usernameLabel,
+                        text = nameLabel,
                         color = TextDark,
                         style = MaterialTheme.typography.headlineMedium,
                         fontWeight = FontWeight.ExtraBold

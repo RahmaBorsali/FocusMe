@@ -64,6 +64,12 @@ class ProfileViewModel(app: Application) : AndroidViewModel(app) {
     private val repo = ProfileRepository(app.applicationContext)
     private val operationState = MutableStateFlow(ProfileOperationState())
 
+    init {
+        viewModelScope.launch {
+            runCatching { repo.refreshRemoteProfile() }
+        }
+    }
+
     val uiState: StateFlow<ProfileUiState> =
         combine(repo.observeProfile(), operationState) { snapshot, operations ->
             snapshot.toUiState(operations)
@@ -184,6 +190,30 @@ class ProfileViewModel(app: Application) : AndroidViewModel(app) {
                 operationState.value = operationState.value.copy(
                     isClearingAllData = false,
                     error = error.message ?: "Impossible d'effacer les donnees locales."
+                )
+            }
+        }
+    }
+
+    fun deleteAccount(onDone: () -> Unit) {
+        viewModelScope.launch {
+            operationState.value = operationState.value.copy(
+                isClearingAllData = true,
+                error = null,
+                message = null
+            )
+
+            runCatching {
+                repo.deleteAccount()
+            }.onSuccess {
+                operationState.value = operationState.value.copy(
+                    isClearingAllData = false
+                )
+                onDone()
+            }.onFailure { error ->
+                operationState.value = operationState.value.copy(
+                    isClearingAllData = false,
+                    error = error.message ?: "Impossible de supprimer le compte."
                 )
             }
         }

@@ -1,14 +1,12 @@
 package com.example.focusme.data.api
 
+import com.example.focusme.data.api.dto.AttachmentDto
 import com.example.focusme.data.api.dto.ChatConversationDto
 import com.example.focusme.data.api.dto.ChatMessageDto
 import com.example.focusme.data.api.dto.CreateConversationBody
 import com.example.focusme.data.api.dto.SendChatMessageBody
-import retrofit2.http.Body
-import retrofit2.http.GET
-import retrofit2.http.POST
-import retrofit2.http.Path
-import retrofit2.http.Query
+import okhttp3.MultipartBody
+import retrofit2.http.*
 
 interface ChatApi {
 
@@ -24,6 +22,10 @@ interface ChatApi {
         @Query("limit") limit: Int = 50,
         @Query("before") before: String? = null
     ): List<ChatMessageDto>
+
+    @Multipart
+    @POST("api/chat/upload")
+    suspend fun uploadFile(@Part file: MultipartBody.Part): AttachmentDto
 
     @POST("api/chat/messages")
     suspend fun sendMessage(@Body body: SendChatMessageBody): Map<String, Any>

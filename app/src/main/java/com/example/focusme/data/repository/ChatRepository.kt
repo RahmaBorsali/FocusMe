@@ -2,12 +2,17 @@ package com.example.focusme.data.repository
 
 import android.content.Context
 import com.example.focusme.data.api.ApiClient
+import com.example.focusme.data.api.dto.AttachmentDto
 import com.example.focusme.data.api.dto.ChatConversationDto
 import com.example.focusme.data.api.dto.ChatConversationLastMessageDto
 import com.example.focusme.data.api.dto.ChatMessageDto
 import com.example.focusme.data.api.dto.ChatUserDto
 import com.example.focusme.data.api.dto.CreateConversationBody
 import com.example.focusme.data.api.dto.SendChatMessageBody
+import okhttp3.MediaType.Companion.toMediaTypeOrNull
+import okhttp3.MultipartBody
+import okhttp3.RequestBody.Companion.asRequestBody
+import java.io.File
 
 class ChatRepository(
     context: Context
@@ -29,13 +34,20 @@ class ChatRepository(
             .map { it.toDomain() }
             .sortedBy { it.createdAt.orEmpty() }
 
-    suspend fun sendMessage(conversationId: String, text: String) {
+    suspend fun sendMessage(conversationId: String, text: String? = null, attachment: ChatAttachment? = null) {
         api.sendMessage(
             SendChatMessageBody(
                 conversationId = conversationId,
-                text = text.trim()
+                text = text?.trim(),
+                attachment = attachment?.toDto()
             )
         )
+    }
+
+    suspend fun uploadFile(file: File): ChatAttachment {
+        val requestFile = file.asRequestBody(null)
+        val body = MultipartBody.Part.createFormData("file", file.name, requestFile)
+        return api.uploadFile(body).toDomain()
     }
 
     suspend fun markConversationRead(conversationId: String) {
@@ -65,9 +77,26 @@ class ChatRepository(
             conversationId = conversationId,
             sender = (sender ?: ChatUserDto(id = "")).toDomain(),
             recipient = (recipient ?: ChatUserDto(id = "")).toDomain(),
-            text = text?.trim().takeUnless { it.isNullOrBlank() } ?: "Message vide",
+            text = text?.trim(),
+            attachment = attachment?.toDomain(),
             createdAt = createdAt,
             readAt = readAt
+        )
+
+    private fun AttachmentDto.toDomain(): ChatAttachment =
+        ChatAttachment(
+            url = url,
+            type = type,
+            fileName = fileName,
+            fileSize = fileSize
+        )
+
+    private fun ChatAttachment.toDto(): AttachmentDto =
+        AttachmentDto(
+            url = url,
+            type = type,
+            fileName = fileName,
+            fileSize = fileSize
         )
 
     private fun ChatUserDto.toDomain(): ChatUser =

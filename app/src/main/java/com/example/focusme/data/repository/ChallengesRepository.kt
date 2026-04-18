@@ -2,6 +2,7 @@ package com.example.focusme.data.repository
 
 import android.content.Context
 import com.example.focusme.data.api.ApiClient
+import com.example.focusme.data.api.dto.AttachmentDto
 import com.example.focusme.data.api.dto.ChallengeDto
 import com.example.focusme.data.api.dto.ChallengeDetailsDto
 import com.example.focusme.data.api.dto.ChallengeEntryDto
@@ -21,6 +22,9 @@ import com.example.focusme.data.api.dto.MessageCreateBody
 import com.example.focusme.data.api.dto.OutgoingJoinRequestDto
 import com.example.focusme.data.api.dto.ParticipantDto
 import com.example.focusme.data.local.TokenStore
+import okhttp3.MultipartBody
+import okhttp3.RequestBody.Companion.asRequestBody
+import java.io.File
 import retrofit2.HttpException
 import retrofit2.Response
 
@@ -163,8 +167,14 @@ class ChallengesRepository(
     suspend fun getMessages(id: String, limit: Int = 30, before: String? = null): List<ChallengeMessage> =
         api.messages(id, limit = limit, before = before).map { it.toMessage() }
 
-    suspend fun sendMessage(id: String, text: String) {
-        api.sendMessage(id, MessageCreateBody(text.trim()))
+    suspend fun sendMessage(id: String, text: String? = null, attachment: ChallengeAttachment? = null) {
+        api.sendMessage(id, MessageCreateBody(text = text?.trim(), attachment = attachment?.toDto()))
+    }
+
+    suspend fun uploadFile(challengeId: String, file: File): ChallengeAttachment {
+        val requestFile = file.asRequestBody(null)
+        val body = MultipartBody.Part.createFormData("file", file.name, requestFile)
+        return api.uploadFile(challengeId, body).toDomain()
     }
 
     suspend fun inviteFriend(challengeId: String, userId: String): ChallengeInvitation =
@@ -295,8 +305,25 @@ class ChallengesRepository(
             userId = userId.orEmpty(),
             username = username?.ifBlank { "Membre Focus Me" } ?: "Membre Focus Me",
             avatarUrl = avatarUrl,
-            text = text?.ifBlank { "Message vide" } ?: "Message vide",
+            text = text?.ifBlank { null },
+            attachment = attachment?.toDomain(),
             createdAt = createdAt
+        )
+
+    private fun AttachmentDto.toDomain(): ChallengeAttachment =
+        ChallengeAttachment(
+            url = url,
+            type = type,
+            fileName = fileName,
+            fileSize = fileSize
+        )
+
+    private fun ChallengeAttachment.toDto(): AttachmentDto =
+        AttachmentDto(
+            url = url,
+            type = type,
+            fileName = fileName,
+            fileSize = fileSize
         )
 
     private fun ChallengeInvitationDto.toInvitation(): ChallengeInvitation {

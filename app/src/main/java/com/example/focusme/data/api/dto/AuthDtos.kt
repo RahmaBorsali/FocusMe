@@ -12,6 +12,11 @@ data class LoginRequest(
     val password: String
 )
 
+data class GoogleAuthRequest(
+    val idToken: String,
+    val mode: String = "login"
+)
+
 data class ForgotPasswordRequest(
     val email: String
 )
@@ -45,4 +50,18 @@ data class ApiError(
     val error: String? = null,
     val message: String? = null,
     val details: Any? = null
+)
+
+data class GoogleDataDto(
+    val email: String,
+    val displayName: String?,
+    val avatarUrl: String?,
+    val googleSub: String?
+)
+
+data class GoogleAuthResponse(
+    val accessToken: String? = null,
+    val user: UserDto? = null,
+    val isNewUser: Boolean? = false,
+    val googleData: GoogleDataDto? = null
 )

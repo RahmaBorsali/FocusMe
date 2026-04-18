@@ -16,7 +16,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Send
+import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -32,12 +32,27 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.focusme.data.repository.ChallengeMessage
 import com.example.focusme.presentation.ui.components.SoftCard
-import com.example.focusme.presentation.ui.theme.PinkPrimary
-import com.example.focusme.presentation.ui.theme.TextGray
 import androidx.compose.ui.unit.dp
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.material.icons.filled.AttachFile
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.Image
+import androidx.compose.ui.platform.LocalContext
+import com.example.focusme.data.repository.ChallengeAttachment
+import com.example.focusme.presentation.ui.theme.AppBg
+import com.example.focusme.presentation.ui.theme.PinkPrimary
+import com.example.focusme.presentation.ui.theme.TextDark
+import com.example.focusme.presentation.ui.theme.TextGray
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.size
 
 @Composable
 fun ChallengeChatScreen(
@@ -46,6 +61,17 @@ fun ChallengeChatScreen(
     vm: ChallengeChatViewModel = viewModel()
 ) {
     val ui by vm.uiState.collectAsState()
+    val context = LocalContext.current
+
+    val filePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        uri?.let {
+            val file = uriToFile(context, it)
+            if (file != null) vm.selectFile(file)
+        }
+    }
+
     LaunchedEffect(id) { vm.load(id) }
 
     ChallengeScreenContainer(
@@ -71,20 +97,37 @@ fun ChallengeChatScreen(
                 }
             }
             Spacer(Modifier.height(10.dp))
-            SoftCard(modifier = androidx.compose.ui.Modifier.fillMaxWidth()) {
-                Text("Nouveau message", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.ExtraBold)
-                Spacer(Modifier.height(8.dp))
+                ui.selectedFile?.let { file ->
+                    SoftCard(
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                        padding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+                        containerColor = PinkPrimary.copy(alpha = 0.1f)
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.Description, contentDescription = null, tint = PinkPrimary, modifier = Modifier.size(24.dp))
+                            Spacer(Modifier.width(8.dp))
+                            Text(file.name, style = MaterialTheme.typography.bodyMedium, color = Color.Black, modifier = Modifier.weight(1f), maxLines = 1)
+                            IconButton(onClick = vm::clearAttachment) {
+                                Icon(Icons.Default.Close, contentDescription = "Supprimer", tint = TextGray)
+                            }
+                        }
+                    }
+                }
+
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                     verticalAlignment = Alignment.Bottom
                 ) {
+                    IconButton(onClick = { filePickerLauncher.launch(arrayOf("*/*")) }) {
+                        Icon(Icons.Default.AttachFile, contentDescription = "Joindre", tint = TextGray)
+                    }
                     OutlinedTextField(
                         value = ui.composer,
                         onValueChange = vm::updateComposer,
                         modifier = Modifier.weight(1f),
                         placeholder = { Text("Ex: J'ai fini mon bloc de 50 min") },
-                        minLines = 2,
+                        minLines = 1,
                         maxLines = 4,
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedContainerColor = Color.White,
@@ -100,9 +143,9 @@ fun ChallengeChatScreen(
                         contentAlignment = Alignment.Center
                     ) {
                         if (ui.isSending) {
-                            Text("...", color = Color.White, fontWeight = FontWeight.Bold)
+                            CircularProgressIndicator(modifier = Modifier.size(20.dp), color = Color.White, strokeWidth = 2.dp)
                         } else {
-                            Icon(Icons.Default.Send, contentDescription = null, tint = Color.White)
+                            Icon(Icons.AutoMirrored.Filled.Send, contentDescription = null, tint = Color.White)
                         }
                     }
                 }
@@ -110,7 +153,6 @@ fun ChallengeChatScreen(
                     Spacer(Modifier.height(8.dp))
                     Text(ui.actionError!!, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
                 }
-            }
         }
     }
 }
@@ -131,18 +173,94 @@ private fun MessageBubble(message: ChallengeMessage) {
                 .background(Color.White)
                 .padding(horizontal = 14.dp, vertical = 12.dp)
         ) {
-            Column {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(message.username, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
-                    Text(message.createdAt.toReadableDateTime(), color = TextGray, style = MaterialTheme.typography.bodySmall)
+                Column {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(message.username, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
+                        Text(message.createdAt.toReadableDateTime(), color = TextGray, style = MaterialTheme.typography.bodySmall)
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    
+                    message.attachment?.let { attachment ->
+                        AttachmentView(attachment = attachment)
+                        if (!message.text.isNullOrBlank()) Spacer(Modifier.height(8.dp))
+                    }
+                    
+                    if (!message.text.isNullOrBlank()) {
+                        Text(message.text, style = MaterialTheme.typography.bodyMedium)
+                    }
                 }
-                Spacer(Modifier.height(8.dp))
-                Text(message.text, style = MaterialTheme.typography.bodyMedium)
-            }
         }
     }
+}
+
+@Composable
+private fun AttachmentView(
+    attachment: ChallengeAttachment
+) {
+    val context = LocalContext.current
+    val isImage = attachment.type.startsWith("image/", ignoreCase = true)
+
+    Column(
+        modifier = Modifier
+            .clip(RoundedCornerShape(12.dp))
+            .background(AppBg)
+            .padding(8.dp)
+            .clickable {
+                try {
+                    val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(attachment.url))
+                    context.startActivity(intent)
+                } catch (e: Exception) { }
+            }
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(
+                imageVector = if (isImage) Icons.Default.Image else Icons.Default.Description,
+                contentDescription = null,
+                tint = PinkPrimary,
+                modifier = Modifier.size(28.dp)
+            )
+            Spacer(Modifier.width(8.dp))
+            Column {
+                Text(
+                    text = attachment.fileName,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = TextDark,
+                    maxLines = 1
+                )
+                Text(
+                    text = "${attachment.fileSize / 1024} KB",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = TextGray
+                )
+            }
+            Spacer(Modifier.weight(1f))
+            Icon(
+                imageVector = Icons.Default.Download,
+                contentDescription = "Télécharger",
+                tint = TextGray,
+                modifier = Modifier.size(20.dp)
+            )
+        }
+    }
+}
+
+private fun uriToFile(context: android.content.Context, uri: android.net.Uri): java.io.File? {
+    return runCatching {
+        val inputStream = context.contentResolver.openInputStream(uri) ?: return null
+        val fileName = context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+            val nameIndex = cursor.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
+            cursor.moveToFirst()
+            cursor.getString(nameIndex)
+        } ?: "upload_${System.currentTimeMillis()}"
+
+        val file = java.io.File(context.cacheDir, fileName)
+        file.outputStream().use { outputStream ->
+            inputStream.copyTo(outputStream)
+        }
+        file
+    }.getOrNull()
 }

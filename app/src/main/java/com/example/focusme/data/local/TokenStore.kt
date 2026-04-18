@@ -5,6 +5,7 @@ import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import com.example.focusme.data.api.dto.ProfileResponse
 import com.example.focusme.data.api.dto.UserDto
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
@@ -139,6 +140,27 @@ class TokenStore(private val context: Context) {
             } else {
                 prefs[KEY_STUDY_GOAL] = trimmedGoal
             }
+        }
+    }
+
+    suspend fun saveRemoteProfile(profile: ProfileResponse) {
+        context.dataStore.edit { prefs ->
+            prefs[KEY_USER_ID] = profile.id
+            prefs[KEY_USERNAME] = profile.username
+            prefs[KEY_EMAIL] = profile.email
+            prefs[KEY_GUEST_MODE] = false
+
+            profile.avatarType?.let { prefs[KEY_AVATAR_TYPE] = it } ?: prefs.remove(KEY_AVATAR_TYPE)
+            profile.avatarInitials?.let { prefs[KEY_AVATAR_INITIALS] = it } ?: prefs.remove(KEY_AVATAR_INITIALS)
+            profile.avatarUrl?.let { prefs[KEY_AVATAR_URL] = it } ?: prefs.remove(KEY_AVATAR_URL)
+
+            profile.displayName?.trim()?.takeIf { it.isNotBlank() }?.let {
+                prefs[KEY_DISPLAY_NAME] = it
+            } ?: prefs.remove(KEY_DISPLAY_NAME)
+
+            profile.studyGoal?.trim()?.takeIf { it.isNotBlank() }?.let {
+                prefs[KEY_STUDY_GOAL] = it
+            } ?: prefs.remove(KEY_STUDY_GOAL)
         }
     }
 

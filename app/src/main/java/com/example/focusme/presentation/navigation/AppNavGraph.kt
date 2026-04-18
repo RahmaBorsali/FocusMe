@@ -78,8 +78,7 @@ fun AppNavGraph(navController: NavHostController) {
         composable(Routes.LOGIN) {
             LoginScreen(
                 onBack = { navController.popBackStack() },
-                onLogin = { email, password ->
-                    // TODO: call backend later
+                onLogin = { _, _ ->
                     navController.navigate(Routes.FOCUS) {
                         popUpTo(Routes.WELCOME) { inclusive = true }
                     }
@@ -101,9 +100,7 @@ fun AppNavGraph(navController: NavHostController) {
         composable(Routes.SIGNUP) {
             SignupScreen(
                 onBack = { navController.popBackStack() },
-                onSignup = { username, email, password, confirm ->
-                    // TODO: call backend later
-                    // After signup: go to login or show "check your email"
+                onSignup = { _, _, _, _ ->
                     navController.navigate(Routes.LOGIN) {
                         popUpTo(Routes.WELCOME) { inclusive = false }
                     }
@@ -114,8 +111,7 @@ fun AppNavGraph(navController: NavHostController) {
         composable(Routes.FORGOT_PASSWORD) {
             ForgotPasswordScreen(
                 onBack = { navController.popBackStack() },
-                onResetPassword = { email ->
-                    // TODO: call backend reset
+                onResetPassword = { _ ->
                     navController.popBackStack()
                 }
             )

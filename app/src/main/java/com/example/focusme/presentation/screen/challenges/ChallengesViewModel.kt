@@ -111,6 +111,8 @@ data class ChallengeChatUiState(
     val isRefreshing: Boolean = false,
     val composer: String = "",
     val isSending: Boolean = false,
+    val selectedFile: java.io.File? = null,
+    val isUploading: Boolean = false,
     val actionError: String? = null
 )
 
@@ -1018,21 +1020,41 @@ class ChallengeChatViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    fun selectFile(file: java.io.File) {
+        _uiState.update { it.copy(selectedFile = file, actionError = null) }
+    }
+
+    fun clearAttachment() {
+        _uiState.update { it.copy(selectedFile = null, actionError = null) }
+    }
+
     fun sendMessage(id: String) {
         val text = uiState.value.composer.trim()
-        if (text.isBlank()) return
+        val file = uiState.value.selectedFile
+
+        if (text.isBlank() && file == null) {
+            _uiState.update { it.copy(actionError = "Ecris un message ou choisis un fichier.") }
+            return
+        }
+
         viewModelScope.launch {
-            _uiState.update { it.copy(isSending = true, actionError = null) }
-            runCatching { repo.sendMessage(id, text) }
-                .onSuccess {
-                    _uiState.update { it.copy(isSending = false, composer = "") }
-                    load(id, refresh = true)
+            _uiState.update { it.copy(isSending = true, isUploading = file != null, actionError = null) }
+            
+            runCatching {
+                val attachment = file?.let { repo.uploadFile(id, it) }
+                repo.sendMessage(id, text.ifBlank { null }, attachment)
+            }.onSuccess {
+                _uiState.update { it.copy(isSending = false, isUploading = false, composer = "", selectedFile = null) }
+                load(id, refresh = true)
+            }.onFailure { throwable ->
+                _uiState.update {
+                    it.copy(
+                        isSending = false,
+                        isUploading = false,
+                        actionError = throwable.toUserMessage()
+                    )
                 }
-                .onFailure { throwable ->
-                    _uiState.update {
-                        it.copy(isSending = false, actionError = throwable.toUserMessage())
-                    }
-                }
+            }
         }
     }
 }

@@ -76,6 +76,9 @@ object ApiClient {
 
     fun challengesApi(context: Context): ChallengesApi =
         createRetrofit(context).create(ChallengesApi::class.java)
+
+    fun profileApi(context: Context): ProfileApi =
+        createRetrofit(context).create(ProfileApi::class.java)
 }
 
 private fun HttpUrl.retargetTo(baseUrl: HttpUrl): HttpUrl =
