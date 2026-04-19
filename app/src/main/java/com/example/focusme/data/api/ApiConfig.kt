@@ -6,6 +6,7 @@ import okhttp3.HttpUrl
 import okhttp3.HttpUrl.Companion.toHttpUrl
 
 object ApiConfig {
+    private const val RENDER_BASE_URL = "https://focusmebackend.onrender.com/"
     private const val EMULATOR_BASE_URL = "http://10.0.2.2:4000/"
     private const val LOCALHOST_BASE_URL = "http://127.0.0.1:4000/"
     private const val LOCALHOST_NAME_BASE_URL = "http://localhost:4000/"
@@ -20,9 +21,9 @@ object ApiConfig {
         }
 
         return if (isProbablyEmulator()) {
-            listOf(EMULATOR_BASE_URL, LOCALHOST_BASE_URL, LOCALHOST_NAME_BASE_URL)
+            listOf(RENDER_BASE_URL, EMULATOR_BASE_URL, LOCALHOST_BASE_URL, LOCALHOST_NAME_BASE_URL)
         } else {
-            listOf(LOCALHOST_BASE_URL, LOCALHOST_NAME_BASE_URL)
+            listOf(RENDER_BASE_URL, LOCALHOST_BASE_URL, LOCALHOST_NAME_BASE_URL)
         }
     }
 
