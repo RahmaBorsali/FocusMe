@@ -27,6 +27,7 @@ object Routes {
     const val MUSIC_DETAIL = "music?openPlayer={openPlayer}"
     fun musicRoute(openPlayer: Boolean = false) =
         if (openPlayer) "music?openPlayer=true" else MUSIC
+    const val MUSIC_SUBSCRIPTION = "music_subscription"
     const val PROFILE = "profile"
     const val PROFILE_HISTORY = "profile_history"
     const val PROFILE_STATS = "profile_stats"
@@ -39,6 +40,9 @@ object Routes {
     const val SIGNUP_CHOICE = "signup_choice"
     const val SIGNUP = "signup"
     const val FORGOT_PASSWORD = "forgot_password"
+    const val VERIFY_CODE = "verify_code/{email}"
+    const val VERIFY_SIGNUP = "verify_signup/{email}"
+    const val RESET_PASSWORD_CONFIRM = "reset_password_confirm/{email}/{code}"
     fun addTaskRoute(y: Int, m: Int, d: Int) = "add_task/$y/$m/$d"
     const val EDIT_TASK = "edit_task/{taskId}"
     fun editTaskRoute(taskId: Long) = "edit_task/$taskId"

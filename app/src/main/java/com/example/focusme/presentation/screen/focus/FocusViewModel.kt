@@ -2,7 +2,8 @@ package com.example.focusme.presentation.screen.focus
 
 import android.content.Context
 import android.util.Log
-import androidx.lifecycle.ViewModel
+import android.app.Application
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.focusme.data.local.StudySessionEntity
 import com.example.focusme.data.local.TaskEntity
@@ -65,12 +66,34 @@ data class FocusUiState(
     val showPostponeForTaskId: Long? = null
 )
 
-class FocusViewModel : ViewModel() {
-
+class FocusViewModel(application: Application) : AndroidViewModel(application) {
+    private val context = application.applicationContext
     private val _uiState = MutableStateFlow(FocusUiState())
     val uiState: StateFlow<FocusUiState> = _uiState
 
-    private var timerJob: Job? = null
+    init {
+        viewModelScope.launch {
+            FocusTimerManager.state.collect { ts ->
+                _uiState.update { it.copy(
+                    remainingSeconds = ts.remainingSeconds,
+                    totalSeconds = ts.totalSeconds,
+                    isRunning = ts.isRunning,
+                    startedAtMillis = ts.startedAtMillis,
+                    alarmTrigger = ts.alarmTrigger,
+                    showQuickButtons = ts.totalSeconds <= 0
+                ) }
+                
+                // If timer finished and we are not already showing summary
+                if (ts.alarmTrigger != 0L && !_uiState.value.showSummary) {
+                    finishSession(triggerAlarm = false) // Don't re-trigger alarm in finishSession, manager already did
+                    viewModelScope.launch {
+                        delay(1000) // Give UI time to see the trigger and play sound
+                        FocusTimerManager.clearAlarmTrigger()
+                    }
+                }
+            }
+        }
+    }
 
     // --------------------
     // TASKS MANAGEMENT
@@ -167,7 +190,7 @@ class FocusViewModel : ViewModel() {
         val secs = (_uiState.value.tempMinutes * 60).coerceAtLeast(0)
         val shouldStart = _uiState.value.startAfterSetTime
 
-        stopInternal()
+        FocusTimerManager.setTime(secs)
 
         _uiState.update { s ->
             s.copy(
@@ -198,7 +221,7 @@ class FocusViewModel : ViewModel() {
 
     fun setMinutesQuick(minutes: Int) {
         val secs = (minutes * 60).coerceAtLeast(0)
-        stopInternal()
+        FocusTimerManager.setTime(secs)
         _uiState.update {
             it.copy(
                 totalSeconds = secs,
@@ -222,52 +245,28 @@ class FocusViewModel : ViewModel() {
     }
 
     fun startTimer() {
-        val s = _uiState.value
-        if (s.remainingSeconds <= 0 || s.isRunning) return
-
-        if (s.startedAtMillis == null) {
-            _uiState.update { it.copy(startedAtMillis = System.currentTimeMillis()) }
-        }
-
-        _uiState.update { it.copy(isRunning = true) }
-
-        timerJob?.cancel()
-        timerJob = viewModelScope.launch {
-            while (_uiState.value.isRunning && _uiState.value.remainingSeconds > 0) {
-                delay(1000)
-                _uiState.update { cur ->
-                    cur.copy(remainingSeconds = (cur.remainingSeconds - 1).coerceAtLeast(0))
-                }
-            }
-
-            if (_uiState.value.remainingSeconds == 0 && _uiState.value.startedAtMillis != null) {
-                finishSession(triggerAlarm = true)
-            } else {
-                _uiState.update { it.copy(isRunning = false) }
-            }
-        }
+        FocusTimerManager.start()
     }
 
     fun pauseTimer() {
-        _uiState.update { it.copy(isRunning = false) }
-        stopInternal()
+        FocusTimerManager.pause()
     }
 
-    fun resumeTimer() = startTimer()
+    fun resumeTimer() = FocusTimerManager.start()
 
     fun addMinutes(delta: Int) {
-        val add = delta * 60
-        _uiState.update { s ->
-            val newRemaining = (s.remainingSeconds + add).coerceAtLeast(0)
-            s.copy(remainingSeconds = newRemaining)
-        }
+        val currentRem = FocusTimerManager.state.value.remainingSeconds
+        val currentTot = FocusTimerManager.state.value.totalSeconds
+        val newRem = (currentRem + (delta * 60)).coerceAtLeast(0)
+        FocusTimerManager.setTime(newRem) // Simplification for adding minutes
+        // Actually we might want a proper addMinutes in Manager, but this works for now
     }
 
     fun askStop() = _uiState.update { it.copy(showStopDialog = true) }
     fun cancelStop() = _uiState.update { it.copy(showStopDialog = false) }
 
     fun confirmStop() {
-        stopInternal()
+        FocusTimerManager.pause()
         finishSession(triggerAlarm = false)
     }
 
@@ -395,12 +394,7 @@ class FocusViewModel : ViewModel() {
     }
 
     fun closeSummaryAndReset() {
-        stopInternal()
+        FocusTimerManager.reset()
         _uiState.update { FocusUiState() }
-    }
-
-    private fun stopInternal() {
-        timerJob?.cancel()
-        timerJob = null
     }
 }

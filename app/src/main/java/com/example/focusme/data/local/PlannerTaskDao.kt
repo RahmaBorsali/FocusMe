@@ -32,5 +32,8 @@ interface PlannerTaskDao {
     @Query("DELETE FROM planner_tasks")
     suspend fun deleteAll()
 
+    @Query("SELECT COUNT(*) FROM planner_tasks")
+    suspend fun countAll(): Int
+
 
 }

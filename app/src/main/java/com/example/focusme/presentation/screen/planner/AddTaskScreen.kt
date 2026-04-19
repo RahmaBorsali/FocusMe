@@ -35,6 +35,7 @@ import android.app.Application
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.ViewModelProvider
+import androidx.compose.ui.unit.sp
 
 @Composable
 fun AddTaskScreen(
@@ -107,6 +108,30 @@ fun AddTaskScreen(
                         color = textGray,
                         style = MaterialTheme.typography.titleMedium
                     )
+                }
+            }
+
+            if (ui.error != null) {
+                Spacer(Modifier.height(16.dp))
+                Surface(
+                    color = Color(0xFFFFF3F3),
+                    shape = RoundedCornerShape(16.dp),
+                    border = BorderStroke(1.dp, Color(0xFFFEB2B2)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier.padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("⚠️", fontSize = 20.sp)
+                        Spacer(Modifier.width(12.dp))
+                        Text(
+                            text = ui.error!!,
+                            color = Color(0xFFC53030),
+                            fontWeight = FontWeight.Bold,
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    }
                 }
             }
 

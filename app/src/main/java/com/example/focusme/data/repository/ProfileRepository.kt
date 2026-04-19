@@ -109,6 +109,10 @@ class ProfileRepository(context: Context) {
         tokenStore.setDefaultAllowComments(enabled)
     }
 
+    suspend fun setAlarmSound(sound: String) {
+        tokenStore.setAlarmSound(sound)
+    }
+
     suspend fun deleteSession(id: Long) {
         database.studySessionDao().deleteById(id)
     }

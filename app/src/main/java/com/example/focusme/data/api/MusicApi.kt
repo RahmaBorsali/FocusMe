@@ -1,45 +1,46 @@
 package com.example.focusme.data.api
 
 import com.google.gson.annotations.SerializedName
+import retrofit2.http.Body
 import retrofit2.http.GET
+import retrofit2.http.POST
 import retrofit2.http.Path
 import retrofit2.http.Query
 
-data class AudiusResponse<T>(
-    val data: T? = null
+// --- Nouveaux DTOs pour le système d'Abonnement ---
+
+data class MusicPackDto(
+    @SerializedName("_id") val id: String,
+    val name: String,
+    val description: String,
+    val category: String,
+    val imageUrl: String,
+    val isFree: Boolean = true,
+    val tracksCount: Int = 0
 )
 
-data class AudiusArtworkDto(
-    @SerializedName("150x150") val small: String? = null,
-    @SerializedName("480x480") val medium: String? = null,
-    @SerializedName("1000x1000") val large: String? = null
+data class SubscribeRequest(
+    val packId: String,
+    val subscribe: Boolean
 )
 
-data class AudiusUserDto(
-    val name: String? = null,
-    val handle: String? = null
+data class SubscribeResponse(
+    val success: Boolean,
+    val subscriptions: List<String>
 )
 
-data class AudiusTrackNetworkDto(
-    val id: String? = null,
-    @SerializedName("title") val title: String? = null,
-    val duration: Long? = null,
-    val genre: String? = null,
-    @SerializedName("release_date") val releaseDate: String? = null,
-    val downloadable: Boolean? = null,
-    @SerializedName("play_count") val playCount: Int? = null,
-    val artwork: AudiusArtworkDto? = null,
-    val user: AudiusUserDto? = null
+data class MusicTrackNetworkDto(
+    @SerializedName("_id") val id: String,
+    val title: String,
+    val artist: String? = "FocusMe",
+    val audioUrl: String,
+    val artworkUrl: String? = null,
+    val durationSeconds: Int = 0,
+    val packName: String? = null,
+    val packId: String? = null
 )
 
-data class AudiusPlaylistNetworkDto(
-    val id: String? = null,
-    @SerializedName("playlist_name") val playlistName: String? = null,
-    val description: String? = null,
-    val artwork: AudiusArtworkDto? = null,
-    @SerializedName("track_count") val trackCount: Int? = null,
-    val user: AudiusUserDto? = null
-)
+// --- Modèle de Domaine (Gardé pour compatibilité UI) ---
 
 data class TrackDto(
     val trackId: String? = null,
@@ -77,24 +78,16 @@ data class TrackDto(
 }
 
 interface MusicApi {
-    @GET("tracks/trending")
-    suspend fun getTrendingTracks(
-        @Query("limit") limit: Int = 20
-    ): AudiusResponse<List<AudiusTrackNetworkDto>>
+    @GET("music/packs")
+    suspend fun getAvailablePacks(): List<MusicPackDto>
 
-    @GET("tracks/search")
-    suspend fun searchTracks(
-        @Query("query") query: String,
-        @Query("limit") limit: Int = 20
-    ): AudiusResponse<List<AudiusTrackNetworkDto>>
+    @GET("music/my-tracks")
+    suspend fun getMySubscribedTracks(): List<MusicTrackNetworkDto>
 
-    @GET("playlists/trending")
-    suspend fun getTrendingPlaylists(
-        @Query("limit") limit: Int = 10
-    ): AudiusResponse<List<AudiusPlaylistNetworkDto>>
+    @POST("music/subscribe")
+    suspend fun updateSubscription(@Body req: SubscribeRequest): SubscribeResponse
 
-    @GET("playlists/{id}/tracks")
-    suspend fun getPlaylistTracks(
-        @Path("id") id: String
-    ): AudiusResponse<List<AudiusTrackNetworkDto>>
+    // Route utilitaire pour peupler la DB au premier test
+    @POST("music/seed")
+    suspend fun seedMusic(): Map<String, Any>
 }

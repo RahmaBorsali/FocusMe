@@ -29,6 +29,7 @@ data class ProfileUiState(
     val soundEnabled: Boolean = true,
     val defaultVisibility: String = "friends",
     val defaultAllowComments: Boolean = true,
+    val alarmSound: String = "classic",
     val sessions: List<com.example.focusme.data.local.StudySessionEntity> = emptyList(),
     val totalSessions: Int = 0,
     val totalFocusSeconds: Int = 0,
@@ -132,6 +133,12 @@ class ProfileViewModel(app: Application) : AndroidViewModel(app) {
     fun setDefaultAllowComments(enabled: Boolean) {
         viewModelScope.launch {
             repo.setDefaultAllowComments(enabled)
+        }
+    }
+
+    fun setAlarmSound(sound: String) {
+        viewModelScope.launch {
+            repo.setAlarmSound(sound)
         }
     }
 
@@ -277,6 +284,7 @@ class ProfileViewModel(app: Application) : AndroidViewModel(app) {
             soundEnabled = session.soundEnabled,
             defaultVisibility = session.defaultVisibility,
             defaultAllowComments = session.defaultAllowComments,
+            alarmSound = session.alarmSound,
             sessions = sessions,
             totalSessions = sessions.size,
             totalFocusSeconds = totalFocusSeconds,

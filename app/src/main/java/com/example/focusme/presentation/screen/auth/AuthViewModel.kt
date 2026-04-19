@@ -25,7 +25,8 @@ data class AuthUiState(
     val showSignupEmailExistsDialog: Boolean = false,
     val googleEmail: String? = null,
     val googleName: String? = null,
-    val googleSub: String? = null
+    val googleSub: String? = null,
+    val resetEmail: String? = null
 )
 
 class AuthViewModel(app: Application) : AndroidViewModel(app) {
@@ -54,7 +55,7 @@ class AuthViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    fun signup(username: String, email: String, password: String, confirm: String) {
+    fun signup(username: String, email: String, password: String, confirm: String, onDone: (String) -> Unit) {
         val usernameValue = username.trim()
         val emailValue = email.trim()
         val validation = validateSignup(usernameValue, emailValue, password, confirm)
@@ -66,10 +67,29 @@ class AuthViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             _ui.value = AuthUiState(loading = true)
             val res = repo.signup(username, email, password, confirm)
-            _ui.value = if (res.isSuccess) {
-                AuthUiState(success = res.getOrNull() ?: "Compte cree avec succes.")
+            if (res.isSuccess) {
+                _ui.value = AuthUiState(success = "Compte cree. Merci de verifier ton email.", resetEmail = emailValue)
+                onDone(emailValue)
             } else {
-                AuthUiState(error = normalizeAuthError(res.exceptionOrNull()?.message, isSignup = true))
+                _ui.value = AuthUiState(error = normalizeAuthError(res.exceptionOrNull()?.message, isSignup = true))
+            }
+        }
+    }
+
+    fun verifySignupEmail(email: String, code: String, onDone: () -> Unit) {
+        if (email.isBlank()) {
+            _ui.update { it.copy(error = "E-mail manquant. Recommence.") }
+            return
+        }
+
+        viewModelScope.launch {
+            _ui.update { it.copy(loading = true, error = null, success = null) }
+            val res = repo.verifyEmail(email, code)
+            if (res.isSuccess) {
+                _ui.update { it.copy(loading = false, success = "Email verifier avec succes !") }
+                onDone()
+            } else {
+                _ui.update { it.copy(loading = false, error = normalizeAuthError(res.exceptionOrNull()?.message, false)) }
             }
         }
     }
@@ -115,7 +135,7 @@ class AuthViewModel(app: Application) : AndroidViewModel(app) {
         _ui.update { it.copy(showLoginSignupRedirect = false, showSignupEmailExistsDialog = false) }
     }
 
-    fun forgotPassword(email: String, onDone: () -> Unit) {
+    fun forgotPassword(email: String, onDone: (String) -> Unit) {
         val emailValue = email.trim()
         if (emailValue.isBlank()) {
             _ui.value = AuthUiState(emailError = "Entre ton email.")
@@ -130,11 +150,38 @@ class AuthViewModel(app: Application) : AndroidViewModel(app) {
             _ui.value = AuthUiState(loading = true)
             val result = repo.forgotPassword(emailValue)
             _ui.value = if (result.isSuccess) {
-                AuthUiState(success = result.getOrNull() ?: "Verifie ta boite mail pour reinitialiser ton mot de passe.")
+                AuthUiState(success = result.getOrNull() ?: "Verification code sent.", resetEmail = emailValue)
             } else {
                 AuthUiState(error = normalizeAuthError(result.exceptionOrNull()?.message, isSignup = false))
             }
-            if (result.isSuccess) onDone()
+            if (result.isSuccess) onDone(emailValue)
+        }
+    }
+
+    fun resetPassword(email: String, code: String, password: String, confirm: String, onDone: () -> Unit) {
+        if (email.isBlank()) {
+            _ui.update { it.copy(error = "E-mail manquant. Recommence.") }
+            return
+        }
+
+        if (password.length < 8) {
+            _ui.update { it.copy(passwordError = "Minimum 8 caractères.") }
+            return
+        }
+        if (password != confirm) {
+            _ui.update { it.copy(confirmError = "Pas identique.") }
+            return
+        }
+
+        viewModelScope.launch {
+            _ui.update { it.copy(loading = true, error = null, success = null) }
+            val res = repo.resetPassword(email, code, password, confirm)
+            if (res.isSuccess) {
+                _ui.update { it.copy(loading = false, success = "Mot de passe changer.") }
+                onDone()
+            } else {
+                _ui.update { it.copy(loading = false, error = normalizeAuthError(res.exceptionOrNull()?.message, false)) }
+            }
         }
     }
 
@@ -145,7 +192,8 @@ class AuthViewModel(app: Application) : AndroidViewModel(app) {
                 passwordError = null,
                 usernameError = null,
                 confirmError = null,
-                error = null
+                error = null,
+                success = null
             )
         }
     }
@@ -266,12 +314,15 @@ class AuthViewModel(app: Application) : AndroidViewModel(app) {
             message.contains("verified") || message.contains("confirmer") -> {
                 "Ton email n'est pas encore verifie. Verifie tes mails."
             }
+            message.contains("code") || message.contains("otp") || message.contains("token") -> {
+                "Code invalide ou expirer."
+            }
             message.contains("network") ||
                 message.contains("unable to resolve host") ||
                 message.contains("timeout") ||
                 message.contains("failed to connect") ||
                 message.contains("impossible de joindre le serveur") -> {
-                "Connexion au serveur impossible. Verifie ton internet ou le backend."
+                "Connexion au serveur impossible. Verifie ton internet ou le serveur."
             }
             isSignup -> "Inscription impossible pour le moment. Verifie les informations saisies."
             else -> "Connexion impossible. Verifie ton email ou ton mot de passe."

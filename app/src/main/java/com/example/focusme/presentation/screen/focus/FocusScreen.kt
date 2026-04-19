@@ -2,6 +2,7 @@ package com.example.focusme.presentation.screen.focus
 
 
 
+import android.media.RingtoneManager
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -54,26 +55,66 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import com.example.focusme.data.local.TokenStore
+import kotlinx.coroutines.delay
+import androidx.compose.runtime.snapshotFlow
+import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.collect
 
 @Composable
 fun FocusScreen(vm: FocusViewModel = viewModel(), onOpenPlanner: () -> Unit = {} ) {
     val state by vm.uiState.collectAsState()
     val context = LocalContext.current
     val tokenStore = remember(context) { TokenStore(context) }
-    LaunchedEffect(state.alarmTrigger) {
-        if (state.alarmTrigger != 0L) {
-            val sessionPrefs = tokenStore.getSessionBlocking()
+    LaunchedEffect(Unit) {
+        snapshotFlow { state.alarmTrigger }
+            .filter { it != 0L }
+            .collect {
+                val sessionPrefs = tokenStore.getSessionBlocking()
 
-            if (sessionPrefs.notificationsEnabled) {
-                NotificationHelper.showTimerFinished(context)
-            }
+                if (sessionPrefs.notificationsEnabled) {
+                    NotificationHelper.showTimerFinished(context)
+                }
 
-            if (sessionPrefs.soundEnabled) {
-                val mp = android.media.MediaPlayer.create(context, R.raw.alarm_sound)
-                mp.setOnCompletionListener { it.release() }
-                mp.start()
+                if (sessionPrefs.soundEnabled) {
+                    try {
+                        when (sessionPrefs.alarmSound) {
+                            "zen" -> {
+                                val uri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
+                                val ringtone = RingtoneManager.getRingtone(context, uri)
+                                ringtone?.play()
+                                delay(5000)
+                                if (ringtone?.isPlaying == true) ringtone.stop()
+                            }
+                            "alert" -> {
+                                val uri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
+                                val ringtone = RingtoneManager.getRingtone(context, uri)
+                                ringtone?.play()
+                                delay(5000)
+                                if (ringtone?.isPlaying == true) ringtone.stop()
+                            }
+                            else -> {
+                                val mp = android.media.MediaPlayer.create(context, R.raw.alarm_sound)
+                                mp.setOnCompletionListener { it.release() }
+                                mp.start()
+                                delay(5000)
+                                try {
+                                    if (mp.isPlaying) {
+                                        mp.stop()
+                                        mp.release()
+                                    }
+                                } catch (e: Exception) {
+                                    // already released
+                                }
+                            }
+                        }
+                    } catch (e: Exception) {
+                        // Fallback
+                        val mp = android.media.MediaPlayer.create(context, R.raw.alarm_sound)
+                        mp.setOnCompletionListener { it.release() }
+                        mp.start()
+                    }
+                }
             }
-        }
     }
 
 
@@ -255,7 +296,7 @@ fun FocusScreen(vm: FocusViewModel = viewModel(), onOpenPlanner: () -> Unit = {}
                     Spacer(Modifier.height(14.dp))
 
                     TaskInProgressCard(
-                        taskTitle = state.sessionTasks.getOrNull(state.currentTaskIndex)?.title ?: "",
+                        tasks = state.sessionTasks,
                         onManage = { vm.openTasksSheet() } // ouvre le sheet
                     )
                 }
@@ -752,7 +793,7 @@ private fun TabPill(
 }
 @Composable
 fun TaskInProgressCard(
-    taskTitle: String,
+    tasks: List<com.example.focusme.data.local.TaskEntity>,
     onManage: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -781,26 +822,35 @@ fun TaskInProgressCard(
                 Spacer(Modifier.width(12.dp))
 
                 Text(
-                    text = "Tâche en cours",
+                    text = "Tâches de la session",
                     color = TextDark,
                     fontWeight = FontWeight.ExtraBold,
                     style = MaterialTheme.typography.titleMedium,
-                    modifier = Modifier.weight(1f),
-                    textAlign = TextAlign.End
+                    modifier = Modifier.weight(1f)
                 )
             }
 
-            Spacer(Modifier.height(14.dp))
-
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("•", color = PinkPrimary, fontSize = 26.sp, lineHeight = 0.sp)
-                Spacer(Modifier.width(10.dp))
-                Text(
-                    text = taskTitle,
-                    color = TextDark,
-                    fontWeight = FontWeight.Medium,
-                    style = MaterialTheme.typography.bodyLarge
-                )
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                tasks.forEach { task ->
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(
+                            modifier = Modifier
+                                .size(8.dp)
+                                .clip(CircleShape)
+                                .background(if (task.isDone) Color(0xFF49B96E) else PinkPrimary)
+                        )
+                        Spacer(Modifier.width(12.dp))
+                        Text(
+                            text = task.title,
+                            color = if (task.isDone) TextGray else TextDark,
+                            style = MaterialTheme.typography.bodyLarge,
+                            fontWeight = if (task.isDone) FontWeight.Normal else FontWeight.Bold,
+                            modifier = Modifier.weight(1f),
+                            maxLines = 1,
+                            textDecoration = if (task.isDone) androidx.compose.ui.text.style.TextDecoration.LineThrough else null
+                        )
+                    }
+                }
             }
 
             Spacer(Modifier.height(16.dp))

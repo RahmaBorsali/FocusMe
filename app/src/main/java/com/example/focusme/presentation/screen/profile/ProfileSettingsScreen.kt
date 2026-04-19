@@ -10,6 +10,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.NotificationsActive
+import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.Icon
@@ -38,6 +39,7 @@ import com.example.focusme.presentation.ui.theme.TextGray
 @Composable
 fun ProfileSettingsScreen(
     onBack: () -> Unit,
+    onOpenMusicSubscription: () -> Unit,
     vm: ProfileViewModel = viewModel()
 ) {
     val ui by vm.uiState.collectAsState()
@@ -73,6 +75,95 @@ fun ProfileSettingsScreen(
                 checked = ui.soundEnabled,
                 onCheckedChange = vm::setSoundEnabled
             )
+        }
+        item {
+            Surface(
+                shape = RoundedCornerShape(28.dp),
+                color = Color.White,
+                tonalElevation = 2.dp,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(20.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(
+                            modifier = Modifier
+                                .size(48.dp)
+                                .clip(RoundedCornerShape(16.dp))
+                                .background(Color(0xFFFFF8E1)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(Icons.Default.NotificationsActive, contentDescription = null, tint = Color(0xFFFFB300))
+                        }
+                        Spacer(Modifier.size(14.dp))
+                        Column {
+                            Text(
+                                text = "Sonnerie de fin",
+                                color = TextDark,
+                                fontWeight = FontWeight.ExtraBold,
+                                style = MaterialTheme.typography.titleLarge
+                            )
+                            Text(
+                                text = "Choisir l'ambiance de l'alerte",
+                                color = TextGray
+                            )
+                        }
+                    }
+                    Spacer(Modifier.height(16.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        SettingsChoiceChip(
+                            text = "Classique",
+                            selected = ui.alarmSound == "classic",
+                            modifier = Modifier.weight(1f),
+                            onClick = { vm.setAlarmSound("classic") }
+                        )
+                        SettingsChoiceChip(
+                            text = "Zen",
+                            selected = ui.alarmSound == "zen",
+                            modifier = Modifier.weight(1f),
+                            onClick = { vm.setAlarmSound("zen") }
+                        )
+                        SettingsChoiceChip(
+                            text = "Alerte",
+                            selected = ui.alarmSound == "alert",
+                            modifier = Modifier.weight(1f),
+                            onClick = { vm.setAlarmSound("alert") }
+                        )
+                    }
+                }
+            }
+        }
+
+        item {
+            Surface(
+                shape = RoundedCornerShape(28.dp),
+                color = Color.White,
+                tonalElevation = 2.dp,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 0.dp)
+                    .clip(RoundedCornerShape(28.dp))
+                    .clickable { onOpenMusicSubscription() }
+            ) {
+                Row(
+                    modifier = Modifier.padding(18.dp, 20.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(48.dp)
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(Color(0xFFFFF0F5)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(Icons.Default.MusicNote, contentDescription = null, tint = PinkPrimary)
+                    }
+                    Spacer(Modifier.size(14.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Abonnement Musique", color = TextDark, fontWeight = FontWeight.ExtraBold, style = MaterialTheme.typography.titleLarge)
+                        Text("Parametrer tes catalogues musicaux", color = TextGray)
+                    }
+                }
+            }
         }
 
         item {
@@ -153,6 +244,7 @@ fun ProfileSettingsScreen(
                     )
                     SettingsSummaryRow("Notifications", if (ui.notificationsEnabled) "Activees" else "Desactivees")
                     SettingsSummaryRow("Son", if (ui.soundEnabled) "Actif" else "Desactive")
+                    SettingsSummaryRow("Sonnerie", ui.alarmSound.replaceFirstChar { it.uppercase() })
                     SettingsSummaryRow("Visibilite", if (ui.defaultVisibility == "friends") "Amis" else "Prive")
                     SettingsSummaryRow("Commentaires", if (ui.defaultAllowComments) "Autorises" else "Desactives")
                 }

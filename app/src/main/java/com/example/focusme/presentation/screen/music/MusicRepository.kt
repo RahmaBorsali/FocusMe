@@ -1,13 +1,15 @@
 package com.example.focusme.presentation.screen.music
 
 import android.content.Context
-import android.net.Uri
 import android.util.Log
-import com.example.focusme.data.api.AudiusPlaylistNetworkDto
-import com.example.focusme.data.api.AudiusTrackNetworkDto
+import com.example.focusme.data.api.ApiClient
 import com.example.focusme.data.api.MusicApi
-import com.example.focusme.data.api.MusicApiModule
+import com.example.focusme.data.api.MusicPackDto
+import com.example.focusme.data.api.MusicTrackNetworkDto
+import com.example.focusme.data.api.SubscribeRequest
 import com.example.focusme.data.api.TrackDto
+import com.example.focusme.data.api.AudiusClient
+import com.example.focusme.data.api.AudiusTrackNetworkDto
 import com.example.focusme.data.local.DbProvider
 import com.example.focusme.data.local.MusicTrackEntity
 import kotlinx.coroutines.Dispatchers
@@ -18,54 +20,66 @@ import java.io.File
 import java.net.URL
 
 class MusicRepository(
-    private val context: Context,
-    private val api: MusicApi = MusicApiModule.api
+    private val context: Context
 ) {
+    private val api: MusicApi = ApiClient.createRetrofit(context).create(MusicApi::class.java)
     private val dao = DbProvider.get(context).musicDao()
 
     suspend fun getHomeData(): MusicHomeData = withContext(Dispatchers.IO) {
         coroutineScope {
+            // Auto-seed si la base est vide pour ne pas avoir d'écran blanc
+            val packs = fetchAvailablePacks()
+            if (packs.isEmpty()) { seedIfEmpty() }
+
             val recentDeferred = async { dao.getRecentlyPlayed().map { it.toDto() } }
-            val mostPlayedDeferred = async { dao.getMostPlayed().map { it.toDto() } }
-            val trendingDeferred = async { fetchTrendingTracks(limit = 12) }
-            val focusDeferred = async { fetchSearchTracks(query = "focus", limit = 12) }
-            val playlistsDeferred = async { fetchTrendingPlaylists(limit = 8) }
+            val myTracksDeferred = async { fetchMyTracks() }
+            
+            val myTracks = myTracksDeferred.await()
+            val externalTracks = if (isSubscribedToAudius()) fetchAudiusTrending() else emptyList()
 
             MusicHomeData(
                 recentlyPlayed = recentDeferred.await(),
-                mostPlayed = mostPlayedDeferred.await(),
-                trendingTracks = trendingDeferred.await(),
-                focusTracks = focusDeferred.await(),
-                playlists = playlistsDeferred.await().ifEmpty { fallbackPlaylists() }
+                trendingTracks = (myTracks + externalTracks).take(30),
+                focusTracks = myTracks.filter { it.tags.any { t -> t.contains("lofi", true) || t.contains("focus", true) } },
+                playlists = packs.map { it.toPlaylist() }
             )
         }
     }
 
+    private fun isSubscribedToAudius(): Boolean = true // Activé par défaut pour "le plus de chansons possible"
+
+    private suspend fun fetchAudiusTrending(): List<TrackDto> {
+        return try {
+            AudiusClient.api.getTrending().data.orEmpty().map { it.toDomain() }
+        } catch (e: Exception) { emptyList() }
+    }
+
+    suspend fun fetchAvailablePacks(): List<MusicPackDto> = withContext(Dispatchers.IO) {
+        try { api.getAvailablePacks() } catch (e: Exception) { emptyList() }
+    }
+
+    suspend fun updateSubscription(packId: String, subscribe: Boolean) = withContext(Dispatchers.IO) {
+        try { api.updateSubscription(SubscribeRequest(packId, subscribe)) } catch (e: Exception) { }
+    }
+
     suspend fun search(term: String): List<TrackDto> = withContext(Dispatchers.IO) {
-        if (term.isBlank()) return@withContext emptyList()
-        val directResults = fetchSearchTracks(query = term.trim(), limit = 30)
-        if (directResults.isNotEmpty()) {
-            directResults
-        } else {
-            fetchTrendingTracks(limit = 18)
+        val localResults = fetchMyTracks().filter { 
+            it.trackName?.contains(term, true) == true || it.artistName?.contains(term, true) == true 
         }
+        
+        val externalResults = if (isSubscribedToAudius()) {
+            try { AudiusClient.api.search(term).data.orEmpty().map { it.toDomain() } } catch (e: Exception) { emptyList() }
+        } else emptyList()
+
+        (localResults + externalResults).distinctBy { it.trackId }
     }
 
     suspend fun getPlaylistTracks(playlist: MusicPlaylist): List<TrackDto> = withContext(Dispatchers.IO) {
-        try {
-            val playlistTracks = api.getPlaylistTracks(playlist.id).data.orEmpty()
-                .map { it.toDomain() }
-                .map { enrichWithLocalState(it) }
-                .filter { it.isPlayable && (it.trackTimeMillis ?: 0L) >= MIN_TRACK_DURATION_MS }
-            if (playlistTracks.isNotEmpty()) {
-                playlistTracks
-            } else {
-                fetchSearchTracks(query = playlist.title, limit = 24)
-            }
-        } catch (throwable: Throwable) {
-            Log.e("MusicRepository", "Playlist tracks failed", throwable)
-            fetchSearchTracks(query = playlist.title, limit = 24)
-        }
+        fetchMyTracks().filter { it.shareUrl == playlist.id }
+    }
+
+    suspend fun fetchMyTracks(): List<TrackDto> = withContext(Dispatchers.IO) {
+        try { api.getMySubscribedTracks().map { it.toDomain() }.map { enrichWithLocalState(it) } } catch (e: Exception) { emptyList() }
     }
 
     suspend fun getLibrary(): List<TrackDto> = withContext(Dispatchers.IO) {
@@ -75,222 +89,66 @@ class MusicRepository(
     suspend fun toggleLibrary(track: TrackDto): TrackDto = withContext(Dispatchers.IO) {
         val trackId = track.trackId ?: return@withContext track
         val existing = dao.getTrackById(trackId)
-        val updated = if (existing == null) {
-            track.toEntity().copy(isInLibrary = true)
-        } else {
-            existing.copy(isInLibrary = !existing.isInLibrary)
-        }
-        if (!updated.isInLibrary && !updated.isDownloaded && updated.playCount == 0) {
-            dao.deleteTrack(trackId)
-            track.copy(isInLibrary = false)
-        } else {
-            dao.insertTrack(updated)
-            updated.toDto()
-        }
+        val updated = if (existing == null) track.toEntity().copy(isInLibrary = true) else existing.copy(isInLibrary = !existing.isInLibrary)
+        dao.insertTrack(updated); updated.toDto()
     }
 
     suspend fun toggleDownload(track: TrackDto): TrackDto = withContext(Dispatchers.IO) {
         val trackId = track.trackId ?: return@withContext track
         val existing = dao.getTrackById(trackId)
-        val safeFileId = trackId.filter { it.isLetterOrDigit() || it == '_' || it == '-' }.ifBlank { "track" }
-
-        if ((existing?.isDownloaded == true) || track.isDownloaded) {
-            val file = File(context.getExternalFilesDir("music"), "track_$safeFileId.mp3")
-            if (file.exists()) file.delete()
-            val base = existing ?: track.toEntity()
-            val updated = base.copy(isDownloaded = false, localPath = null)
-            if (!updated.isInLibrary && updated.playCount == 0) {
-                dao.deleteTrack(trackId)
-                return@withContext track.copy(isDownloaded = false, localPath = null)
-            }
-            dao.insertTrack(updated)
-            return@withContext updated.toDto()
+        val safeFileId = trackId.filter { it.isLetterOrDigit() }
+        if (existing?.isDownloaded == true) {
+            File(context.getExternalFilesDir("music"), "t_$safeFileId.mp3").delete()
+            val updated = existing.copy(isDownloaded = false, localPath = null)
+            dao.insertTrack(updated); return@withContext updated.toDto()
         }
-
-        val remoteUrl = track.downloadUrl ?: track.audioUrl ?: return@withContext track
-        val file = File(context.getExternalFilesDir("music"), "track_$safeFileId.mp3")
-        file.parentFile?.mkdirs()
-
-        URL(remoteUrl).openStream().use { input ->
-            file.outputStream().use { output ->
-                input.copyTo(output)
-            }
-        }
-
-        val updated = (existing ?: track.toEntity()).copy(
-            isDownloaded = true,
-            isInLibrary = true,
-            localPath = file.absolutePath
-        )
-        dao.insertTrack(updated)
-        updated.toDto()
+        val remoteUrl = track.audioUrl ?: return@withContext track
+        val file = File(context.getExternalFilesDir("music"), "t_$safeFileId.mp3")
+        try {
+            URL(remoteUrl).openStream().use { it.copyTo(file.outputStream()) }
+            val updated = (existing ?: track.toEntity()).copy(isDownloaded = true, localPath = file.absolutePath)
+            dao.insertTrack(updated); updated.toDto()
+        } catch (e: Exception) { track }
     }
 
     suspend fun markAsPlayed(track: TrackDto) = withContext(Dispatchers.IO) {
         val trackId = track.trackId ?: return@withContext
-        val existing = dao.getTrackById(trackId)
-        val updated = if (existing == null) {
-            track.toEntity().copy(playCount = 1, lastPlayedAt = System.currentTimeMillis())
-        } else {
-            existing.copy(
-                playCount = existing.playCount + 1,
-                lastPlayedAt = System.currentTimeMillis(),
-                name = track.trackName ?: existing.name,
-                artist = track.artistName ?: existing.artist,
-                albumName = track.albumName ?: existing.albumName,
-                artworkUrl = track.artworkUrl100 ?: existing.artworkUrl,
-                audioUrl = track.audioUrl ?: existing.audioUrl,
-                downloadUrl = track.downloadUrl ?: existing.downloadUrl,
-                shareUrl = track.shareUrl ?: existing.shareUrl,
-                releasedAt = track.releasedAt ?: existing.releasedAt,
-                trackTimeMillis = track.trackTimeMillis ?: existing.trackTimeMillis,
-                tags = track.tags.joinToString(",").ifBlank { existing.tags },
-                isDownloadAllowed = track.isDownloadAllowed || existing.isDownloadAllowed
-            )
-        }
-        dao.insertTrack(updated)
+        val existing = dao.getTrackById(trackId) ?: track.toEntity()
+        dao.insertTrack(existing.copy(playCount = existing.playCount + 1, lastPlayedAt = System.currentTimeMillis()))
     }
 
-    private suspend fun fetchTrendingTracks(limit: Int): List<TrackDto> {
-        return try {
-            api.getTrendingTracks(limit = limit).data.orEmpty()
-                .map { it.toDomain() }
-                .map { enrichWithLocalState(it) }
-                .filter { it.isPlayable && (it.trackTimeMillis ?: 0L) >= MIN_TRACK_DURATION_MS }
-        } catch (throwable: Throwable) {
-            Log.e("MusicRepository", "Trending tracks failed", throwable)
-            emptyList()
-        }
-    }
-
-    private suspend fun fetchSearchTracks(query: String, limit: Int): List<TrackDto> {
-        return try {
-            api.searchTracks(query = query, limit = limit).data.orEmpty()
-                .map { it.toDomain() }
-                .map { enrichWithLocalState(it) }
-                .filter { it.isPlayable && (it.trackTimeMillis ?: 0L) >= MIN_TRACK_DURATION_MS }
-        } catch (throwable: Throwable) {
-            Log.e("MusicRepository", "Search tracks failed", throwable)
-            emptyList()
-        }
-    }
-
-    private suspend fun fetchTrendingPlaylists(limit: Int): List<MusicPlaylist> {
-        return try {
-            api.getTrendingPlaylists(limit = limit).data.orEmpty()
-                .map { it.toPlaylist() }
-        } catch (throwable: Throwable) {
-            Log.e("MusicRepository", "Trending playlists failed", throwable)
-            emptyList()
-        }
+    suspend fun seedIfEmpty() = withContext(Dispatchers.IO) {
+        try { api.seedMusic() } catch (e: Exception) { }
     }
 
     private suspend fun enrichWithLocalState(track: TrackDto): TrackDto {
-        val trackId = track.trackId ?: return track
-        val local = dao.getTrackById(trackId) ?: return track
-        return track.copy(
-            localPath = local.localPath,
-            isDownloaded = local.isDownloaded,
-            isInLibrary = local.isInLibrary,
-            playCount = local.playCount,
-            lastPlayedAt = local.lastPlayedAt
-        )
+        val local = track.trackId?.let { dao.getTrackById(it) } ?: return track
+        return track.copy(localPath = local.localPath, isDownloaded = local.isDownloaded, isInLibrary = local.isInLibrary, playCount = local.playCount)
     }
 
-    private fun AudiusTrackNetworkDto.toDomain(): TrackDto {
-        val streamId = id?.takeIf { it.isNotBlank() }
-        val streamUrl = streamId?.let { buildStreamUrl(it) }
-        val tags = listOfNotNull(genre?.takeIf { it.isNotBlank() }).distinct()
-        return TrackDto(
-            trackId = streamId,
-            trackName = title,
-            artistName = user?.name ?: user?.handle,
-            artworkUrl100 = artwork?.large ?: artwork?.medium ?: artwork?.small,
-            audioUrl = streamUrl,
-            downloadUrl = if (downloadable == true) streamUrl else null,
-            shareUrl = streamId?.let { "https://audius.co/tracks/$it" },
-            releasedAt = releaseDate,
-            tags = tags,
-            trackTimeMillis = duration?.times(1000),
-            isDownloadAllowed = downloadable == true
-        )
-    }
+    private fun MusicTrackNetworkDto.toDomain() = TrackDto(
+        trackId = id, trackName = title, artistName = artist ?: "FocusMe",
+        artworkUrl100 = artworkUrl, audioUrl = audioUrl, shareUrl = packId,
+        trackTimeMillis = durationSeconds.toLong() * 1000, isDownloadAllowed = true
+    )
 
-    private fun AudiusPlaylistNetworkDto.toPlaylist(): MusicPlaylist {
-        val artworkUrl = artwork?.large ?: artwork?.medium ?: artwork?.small
-        val shortSubtitle = when {
-            !user?.name.isNullOrBlank() -> user?.name
-            !description.isNullOrBlank() -> description
-            else -> null
-        }
-        return MusicPlaylist(
-            id = id.orEmpty(),
-            title = playlistName ?: "Playlist",
-            subtitle = shortSubtitle,
-            artworkUrl = artworkUrl,
-            tracksCount = trackCount ?: 0
-        )
-    }
+    private fun AudiusTrackNetworkDto.toDomain() = TrackDto(
+        trackId = id, trackName = title, artistName = user?.name,
+        artworkUrl100 = artwork?.medium, audioUrl = id?.let { "https://api.audius.co/v1/tracks/$it/stream?app_name=FocusMe" },
+        trackTimeMillis = duration?.times(1000), isDownloadAllowed = false
+    )
 
-    private fun TrackDto.toEntity(): MusicTrackEntity {
-        return MusicTrackEntity(
-            id = trackId ?: (audioUrl ?: shareUrl ?: "${trackName.orEmpty()}_${artistName.orEmpty()}"),
-            name = trackName ?: "Titre inconnu",
-            artist = artistName ?: "Artiste inconnu",
-            albumName = albumName,
-            artworkUrl = artworkUrl100,
-            audioUrl = audioUrl,
-            downloadUrl = downloadUrl,
-            shareUrl = shareUrl,
-            releasedAt = releasedAt,
-            localPath = localPath,
-            trackTimeMillis = trackTimeMillis,
-            tags = tags.joinToString(",").ifBlank { null },
-            isDownloaded = isDownloaded,
-            isInLibrary = isInLibrary,
-            isDownloadAllowed = isDownloadAllowed,
-            playCount = playCount,
-            lastPlayedAt = lastPlayedAt
-        )
-    }
+    private fun MusicPackDto.toPlaylist() = MusicPlaylist(id = id, title = name, subtitle = description, artworkUrl = imageUrl, tracksCount = tracksCount)
 
-    private fun MusicTrackEntity.toDto(): TrackDto {
-        return TrackDto(
-            trackId = id,
-            trackName = name,
-            artistName = artist,
-            albumName = albumName,
-            artworkUrl100 = artworkUrl,
-            audioUrl = audioUrl,
-            downloadUrl = downloadUrl,
-            shareUrl = shareUrl,
-            releasedAt = releasedAt,
-            tags = tags?.split(",")?.filter { it.isNotBlank() }.orEmpty(),
-            trackTimeMillis = trackTimeMillis,
-            localPath = localPath,
-            isDownloaded = isDownloaded,
-            isInLibrary = isInLibrary,
-            isDownloadAllowed = isDownloadAllowed,
-            playCount = playCount,
-            lastPlayedAt = lastPlayedAt
-        )
-    }
+    private fun MusicTrackEntity.toDto() = TrackDto(
+        trackId = id, trackName = name, artistName = artist, albumName = albumName, artworkUrl100 = artworkUrl, audioUrl = audioUrl,
+        downloadUrl = downloadUrl, shareUrl = shareUrl, releasedAt = releasedAt, tags = tags?.split(",")?.filter { it.isNotBlank() }.orEmpty(),
+        trackTimeMillis = trackTimeMillis, localPath = localPath, isDownloaded = isDownloaded, isInLibrary = isInLibrary, isDownloadAllowed = isDownloadAllowed, playCount = playCount, lastPlayedAt = lastPlayedAt
+    )
 
-    private fun buildStreamUrl(trackId: String): String {
-        return Uri.Builder()
-            .scheme("https")
-            .authority("api.audius.co")
-            .appendPath("v1")
-            .appendPath("tracks")
-            .appendPath(trackId)
-            .appendPath("stream")
-            .appendQueryParameter("app_name", APP_NAME)
-            .build()
-            .toString()
-    }
-
-    companion object {
-        private const val APP_NAME = "FocusMe"
-        private const val MIN_TRACK_DURATION_MS = 60_000L
-    }
+    private fun TrackDto.toEntity() = MusicTrackEntity(
+        id = trackId ?: "", name = trackName ?: "", artist = artistName ?: "", albumName = albumName, artworkUrl = artworkUrl100, audioUrl = audioUrl,
+        downloadUrl = downloadUrl, shareUrl = shareUrl, releasedAt = releasedAt, localPath = localPath, trackTimeMillis = trackTimeMillis, tags = tags.joinToString(",").ifBlank { null },
+        isDownloaded = isDownloaded, isInLibrary = isInLibrary, isDownloadAllowed = isDownloadAllowed, playCount = playCount, lastPlayedAt = lastPlayedAt
+    )
 }

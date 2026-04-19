@@ -28,7 +28,11 @@ data class StoredSession(
     val notificationsEnabled: Boolean = true,
     val soundEnabled: Boolean = true,
     val defaultVisibility: String = "friends",
-    val defaultAllowComments: Boolean = true
+    val defaultAllowComments: Boolean = true,
+    val alarmSound: String = "classic",
+    val timerEndTime: Long = 0L,
+    val timerTotalSeconds: Int = 0,
+    val timerIsRunning: Boolean = false
 ) {
     val isAuthenticated: Boolean
         get() = !token.isNullOrBlank()
@@ -73,6 +77,10 @@ class TokenStore(private val context: Context) {
     private val KEY_SOUND_ENABLED = booleanPreferencesKey("sound_enabled")
     private val KEY_DEFAULT_VISIBILITY = stringPreferencesKey("default_visibility")
     private val KEY_DEFAULT_ALLOW_COMMENTS = booleanPreferencesKey("default_allow_comments")
+    private val KEY_ALARM_SOUND = stringPreferencesKey("alarm_sound")
+    private val KEY_TIMER_END_TIME = androidx.datastore.preferences.core.longPreferencesKey("timer_end_time")
+    private val KEY_TIMER_TOTAL_SECONDS = androidx.datastore.preferences.core.intPreferencesKey("timer_total_seconds")
+    private val KEY_TIMER_IS_RUNNING = booleanPreferencesKey("timer_is_running")
 
     fun observeSession(): Flow<StoredSession> =
         context.dataStore.data.map { prefs ->
@@ -90,7 +98,11 @@ class TokenStore(private val context: Context) {
                 notificationsEnabled = prefs[KEY_NOTIFICATIONS_ENABLED] ?: true,
                 soundEnabled = prefs[KEY_SOUND_ENABLED] ?: true,
                 defaultVisibility = prefs[KEY_DEFAULT_VISIBILITY] ?: "friends",
-                defaultAllowComments = prefs[KEY_DEFAULT_ALLOW_COMMENTS] ?: true
+                defaultAllowComments = prefs[KEY_DEFAULT_ALLOW_COMMENTS] ?: true,
+                alarmSound = prefs[KEY_ALARM_SOUND] ?: "classic",
+                timerEndTime = prefs[KEY_TIMER_END_TIME] ?: 0L,
+                timerTotalSeconds = prefs[KEY_TIMER_TOTAL_SECONDS] ?: 0,
+                timerIsRunning = prefs[KEY_TIMER_IS_RUNNING] ?: false
             )
         }
 
@@ -175,9 +187,8 @@ class TokenStore(private val context: Context) {
                 prefs.remove(KEY_AVATAR_TYPE)
                 prefs.remove(KEY_AVATAR_INITIALS)
                 prefs.remove(KEY_AVATAR_URL)
-                if (prefs[KEY_DISPLAY_NAME].isNullOrBlank()) {
-                    prefs[KEY_DISPLAY_NAME] = "Invite FocusMe"
-                }
+                prefs.remove(KEY_STUDY_GOAL)
+                prefs[KEY_DISPLAY_NAME] = "Invite FocusMe"
             }
         }
     }
@@ -196,6 +207,26 @@ class TokenStore(private val context: Context) {
 
     suspend fun setDefaultAllowComments(enabled: Boolean) {
         context.dataStore.edit { it[KEY_DEFAULT_ALLOW_COMMENTS] = enabled }
+    }
+
+    suspend fun setAlarmSound(sound: String) {
+        context.dataStore.edit { it[KEY_ALARM_SOUND] = sound }
+    }
+
+    suspend fun saveTimerState(endTime: Long, totalSeconds: Int, isRunning: Boolean) {
+        context.dataStore.edit {
+            it[KEY_TIMER_END_TIME] = endTime
+            it[KEY_TIMER_TOTAL_SECONDS] = totalSeconds
+            it[KEY_TIMER_IS_RUNNING] = isRunning
+        }
+    }
+
+    suspend fun clearTimerState() {
+        context.dataStore.edit {
+            it.remove(KEY_TIMER_END_TIME)
+            it.remove(KEY_TIMER_TOTAL_SECONDS)
+            it.remove(KEY_TIMER_IS_RUNNING)
+        }
     }
 
     suspend fun clear() {

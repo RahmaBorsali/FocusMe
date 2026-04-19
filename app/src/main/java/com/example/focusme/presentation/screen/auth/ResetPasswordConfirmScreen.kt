@@ -2,20 +2,15 @@ package com.example.focusme.presentation.screen.auth
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
@@ -27,28 +22,49 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.focusme.presentation.ui.components.PrimaryButton
+import com.example.focusme.presentation.ui.components.SweetAlertDialog
+import com.example.focusme.presentation.ui.components.SweetAlertType
 import com.example.focusme.presentation.ui.theme.*
 
 @Composable
-fun SignupScreen(
+fun ResetPasswordConfirmScreen(
+    email: String,
+    code: String,
     onBack: () -> Unit,
-    onSignupSuccess: (String) -> Unit,
+    onResetSuccess: () -> Unit,
     vm: AuthViewModel = viewModel()
 ) {
     val uiState by vm.ui.collectAsState()
-    var username by remember { mutableStateOf("") }
-    var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var confirm by remember { mutableStateOf("") }
     var show1 by remember { mutableStateOf(false) }
     var show2 by remember { mutableStateOf(false) }
+    var showSuccessDialog by remember { mutableStateOf(false) }
+
+    LaunchedEffect(uiState.success) {
+        if (uiState.success == "Mot de passe changer.") {
+            showSuccessDialog = true
+        }
+    }
+
+    if (showSuccessDialog) {
+        SweetAlertDialog(
+            title = "Success! ✨",
+            message = "Your password has been updated successfully.",
+            type = SweetAlertType.INFO,
+            onConfirm = {
+                showSuccessDialog = false
+                onResetSuccess()
+            },
+            onDismiss = { showSuccessDialog = false }
+        )
+    }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(Brush.verticalGradient(colors = listOf(AppBg, Color.White)))
-            .padding(horizontal = 24.dp)
-            .verticalScroll(rememberScrollState())
+            .padding(24.dp)
     ) {
         IconButton(
             onClick = onBack,
@@ -57,47 +73,20 @@ fun SignupScreen(
             Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = PinkPrimary)
         }
 
-        Spacer(Modifier.height(30.dp))
-
-        Text("Create Account", fontSize = 32.sp, fontWeight = FontWeight.ExtraBold, color = TextDark)
-        Text("Join our focus community today!", fontSize = 16.sp, color = TextGray, modifier = Modifier.padding(top = 8.dp))
-
         Spacer(Modifier.height(40.dp))
 
-        OutlinedTextField(
-            value = username,
-            onValueChange = { username = it; vm.clearFieldErrors() },
-            label = { Text("Username") },
-            leadingIcon = { Icon(Icons.Default.Person, contentDescription = null, tint = PinkPrimary) },
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(20.dp),
-            singleLine = true,
-            isError = uiState.usernameError != null,
-            supportingText = { uiState.usernameError?.let { Text(it) } },
-            colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = PinkPrimary, unfocusedBorderColor = BorderSoft)
+        Text("Set New Password", fontSize = 32.sp, fontWeight = FontWeight.ExtraBold, color = TextDark)
+        Text(
+            "Final step! Choose a strong password for $email.",
+            fontSize = 16.sp, color = TextGray, modifier = Modifier.padding(top = 8.dp)
         )
 
-        Spacer(Modifier.height(16.dp))
-
-        OutlinedTextField(
-            value = email,
-            onValueChange = { email = it; vm.clearFieldErrors() },
-            label = { Text("Email Address") },
-            leadingIcon = { Icon(Icons.Default.Email, contentDescription = null, tint = PinkPrimary) },
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(20.dp),
-            singleLine = true,
-            isError = uiState.emailError != null,
-            supportingText = { uiState.emailError?.let { Text(it) } },
-            colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = PinkPrimary, unfocusedBorderColor = BorderSoft)
-        )
-
-        Spacer(Modifier.height(16.dp))
+        Spacer(Modifier.height(48.dp))
 
         OutlinedTextField(
             value = password,
             onValueChange = { password = it; vm.clearFieldErrors() },
-            label = { Text("Password") },
+            label = { Text("New Password") },
             leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null, tint = PinkPrimary) },
             trailingIcon = {
                 IconButton(onClick = { show1 = !show1 }) {
@@ -118,7 +107,7 @@ fun SignupScreen(
         OutlinedTextField(
             value = confirm,
             onValueChange = { confirm = it; vm.clearFieldErrors() },
-            label = { Text("Confirm Password") },
+            label = { Text("Confirm New Password") },
             leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null, tint = PinkPrimary) },
             trailingIcon = {
                 IconButton(onClick = { show2 = !show2 }) {
@@ -139,18 +128,16 @@ fun SignupScreen(
             Text(uiState.error!!, color = Color.Red, fontSize = 14.sp)
         }
 
-        Spacer(Modifier.height(40.dp))
+        Spacer(Modifier.height(48.dp))
 
         PrimaryButton(
-            text = if (uiState.loading) "Creating account..." else "Create Account",
+            text = if (uiState.loading) "Updating..." else "Update Password",
             onClick = {
                 if (!uiState.loading) {
-                    vm.signup(username, email, password, confirm, onSignupSuccess)
+                    vm.resetPassword(email, code, password, confirm, onDone = {})
                 }
             },
             modifier = Modifier.fillMaxWidth().height(58.dp)
         )
-
-        Spacer(Modifier.height(24.dp))
     }
 }

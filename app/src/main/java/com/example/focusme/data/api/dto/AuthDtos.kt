@@ -22,9 +22,15 @@ data class ForgotPasswordRequest(
 )
 
 data class ResetPasswordRequest(
+    val email: String,
     val token: String,
     val password: String,
     val confirmPassword: String
+)
+
+data class VerifyEmailRequest(
+    val email: String,
+    val token: String
 )
 
 data class UserDto(

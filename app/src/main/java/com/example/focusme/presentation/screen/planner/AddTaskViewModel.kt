@@ -5,6 +5,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.focusme.data.local.PlannerTaskEntity
 import com.example.focusme.data.local.SubjectEntity
+import com.example.focusme.data.local.TokenStore
 import com.example.focusme.data.repository.PlannerRepository
 import com.example.focusme.data.repository.SubjectRepository
 import kotlinx.coroutines.flow.*
@@ -12,10 +13,12 @@ import kotlinx.coroutines.launch
 import kotlinx.datetime.*
 import kotlinx.datetime.Clock
 
+
 class AddTaskViewModel(app: Application) : AndroidViewModel(app) {
 
     private val subjectRepo = SubjectRepository(app)
     private val plannerRepo = PlannerRepository(app)
+    private val tokenStore = TokenStore(app)
 
     private val _ui = MutableStateFlow(AddTaskUiState())
     val ui: StateFlow<AddTaskUiState> = _ui.asStateFlow()
@@ -44,12 +47,26 @@ class AddTaskViewModel(app: Application) : AndroidViewModel(app) {
         currentDateKey = dateKey
         currentTaskId = taskId
 
-        if (taskId == null) {
-            _ui.update { it.copy(isLoading = false) }
-            return
-        }
-
         viewModelScope.launch {
+            val session = tokenStore.getSessionBlocking()
+            val totalTasks = plannerRepo.getTotalTaskCount()
+            val isGuest = session.isGuest
+            
+            val limitReached = isGuest && totalTasks >= 3 && taskId == null
+            
+            _ui.update { 
+                it.copy(
+                    isGuest = isGuest,
+                    taskCount = totalTasks,
+                    error = if (limitReached) "Limite de 3 tâches atteinte pour les invités." else null
+                )
+            }
+
+            if (taskId == null) {
+                _ui.update { it.copy(isLoading = false) }
+                return@launch
+            }
+
             _ui.update { it.copy(isLoading = true) }
             val task = plannerRepo.getById(taskId)
             if (task != null) {
@@ -65,7 +82,6 @@ class AddTaskViewModel(app: Application) : AndroidViewModel(app) {
                         },
                         selectedSubjectId = task.subjectId,
                         startTimeMinutes = task.startTimeMinutes,
-
                         isLoading = false
                     )
                 }
@@ -136,13 +152,9 @@ class AddTaskViewModel(app: Application) : AndroidViewModel(app) {
                 .toInstant(TimeZone.currentSystemDefault())
                 .toEpochMilliseconds()
 
-            android.util.Log.d("REMINDER_CALC", "dateKey=$currentDateKey startMin=${st.startTimeMinutes} reminderLdt=$reminderLdt reminderMillis=$reminderMillis")
-
-
             val title = st.title.trim()
 
             if (currentTaskId == null) {
-
                 val newId = plannerRepo.insert(
                     PlannerTaskEntity(
                         dateKey = currentDateKey,
@@ -166,7 +178,6 @@ class AddTaskViewModel(app: Application) : AndroidViewModel(app) {
                 )
 
             } else {
-
                 plannerRepo.update(
                     PlannerTaskEntity(
                         id = currentTaskId!!,
@@ -204,14 +215,11 @@ class AddTaskViewModel(app: Application) : AndroidViewModel(app) {
         timeZone: TimeZone = TimeZone.currentSystemDefault(),
         nowInstant: Instant = Clock.System.now()
     ): LocalDateTime {
-
         val hour = startTimeMinutes / 60
         val minute = startTimeMinutes % 60
-
         val taskStartLdt = LocalDateTime(
             taskDate.year, taskDate.monthNumber, taskDate.dayOfMonth, hour, minute
         )
-
         val taskStartInstant = taskStartLdt.toInstant(timeZone)
 
         fun bonusMinutes(p: PriorityUi) = when (p) {
@@ -231,11 +239,8 @@ class AddTaskViewModel(app: Application) : AndroidViewModel(app) {
             durationMinutes in 90..180 -> taskStartInstant.minus(4, DateTimeUnit.HOUR, timeZone)
             else -> {
                 if (isTomorrowMorning) {
-                    // veille à 20:00
                     val veille = taskStartLdt.date.minus(DatePeriod(days = 1))
-                    val veille20 = LocalDateTime(
-                        veille.year, veille.monthNumber, veille.dayOfMonth, 20, 0
-                    )
+                    val veille20 = LocalDateTime(veille.year, veille.monthNumber, veille.dayOfMonth, 20, 0)
                     veille20.toInstant(timeZone)
                 } else {
                     taskStartInstant.minus(6, DateTimeUnit.HOUR, timeZone)
@@ -246,13 +251,9 @@ class AddTaskViewModel(app: Application) : AndroidViewModel(app) {
         val reminderWithBonus = baseReminderInstant.minus(bonusMinutes(priority), DateTimeUnit.MINUTE, timeZone)
         return reminderWithBonus.toLocalDateTime(timeZone)
     }
-    private fun scheduleReminderExact(
-        taskId: Long,
-        title: String,
-        reminderEpochMillis: Long
-    ) {
-        com.example.focusme.reminder.AlarmReminderScheduler.cancel(getApplication(), taskId)
 
+    private fun scheduleReminderExact(taskId: Long, title: String, reminderEpochMillis: Long) {
+        com.example.focusme.reminder.AlarmReminderScheduler.cancel(getApplication(), taskId)
         com.example.focusme.reminder.AlarmReminderScheduler.scheduleExact(
             context = getApplication(),
             taskId = taskId,
@@ -261,10 +262,4 @@ class AddTaskViewModel(app: Application) : AndroidViewModel(app) {
             body = "N'oublie pas ta tâche !"
         )
     }
-
-
-
-
-
-
 }

@@ -86,6 +86,8 @@ class PlannerRepository(private val context: Context) {
             Log.e("PlannerRepository", "postponeTask sync failed", e)
         }
     }
+
+    suspend fun getTotalTaskCount(): Int = dao.countAll()
 }
 
 

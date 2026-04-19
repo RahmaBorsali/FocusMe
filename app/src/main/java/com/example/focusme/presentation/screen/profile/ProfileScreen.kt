@@ -43,12 +43,14 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.focusme.presentation.ui.components.PrimaryButton
 import com.example.focusme.presentation.ui.theme.AppBg
@@ -139,8 +141,15 @@ fun ProfileScreen(
                 icon = Icons.AutoMirrored.Filled.MenuBook,
                 iconTint = Color(0xFFEC5A9A),
                 title = "Historique des sessions",
-                subtitle = "Parcourir tes sessions jour apres jour",
-                onClick = onOpenHistory
+                subtitle = if (ui.accountMode == ProfileAccountMode.GUEST) "Connecte-toi pour voir ton historique" else "Parcourir tes sessions jour apres jour",
+                isLocked = ui.accountMode == ProfileAccountMode.GUEST,
+                onClick = {
+                    if (ui.accountMode == ProfileAccountMode.GUEST) {
+                        // On pourrait afficher un message ou proposer le signup
+                    } else {
+                        onOpenHistory()
+                    }
+                }
             )
         }
 
@@ -149,8 +158,15 @@ fun ProfileScreen(
                 icon = Icons.Default.AutoGraph,
                 iconTint = Color(0xFF6C8EF5),
                 title = "Statistiques avancees",
-                subtitle = "Tendances, heatmap et analyses",
-                onClick = onOpenStats
+                subtitle = if (ui.accountMode == ProfileAccountMode.GUEST) "DeBLOQUE tes analyses avec un compte" else "Tendances, heatmap et analyses",
+                isLocked = ui.accountMode == ProfileAccountMode.GUEST,
+                onClick = {
+                    if (ui.accountMode == ProfileAccountMode.GUEST) {
+                        // dialogue ?
+                    } else {
+                        onOpenStats()
+                    }
+                }
             )
         }
 
@@ -159,8 +175,15 @@ fun ProfileScreen(
                 icon = Icons.Default.EmojiEvents,
                 iconTint = Color(0xFFF3A638),
                 title = "Succes",
-                subtitle = "Niveaux, progression et jalons atteints",
-                onClick = onOpenAchievements
+                subtitle = if (ui.accountMode == ProfileAccountMode.GUEST) "Gagne de l'XP et des badges" else "Niveaux, progression et jalons atteints",
+                isLocked = ui.accountMode == ProfileAccountMode.GUEST,
+                onClick = {
+                    if (ui.accountMode == ProfileAccountMode.GUEST) {
+                        // dialogue ?
+                    } else {
+                        onOpenAchievements()
+                    }
+                }
             )
         }
 
@@ -783,15 +806,17 @@ private fun MenuCard(
     title: String,
     subtitle: String,
     destructive: Boolean = false,
+    isLocked: Boolean = false,
     onClick: () -> Unit
 ) {
     Surface(
         shape = RoundedCornerShape(28.dp),
-        color = Color.White,
-        tonalElevation = 2.dp,
+        color = if (isLocked) Color(0xFFFDFDFD) else Color.White,
+        tonalElevation = if (isLocked) 0.dp else 2.dp,
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
+            .then(if (isLocked) Modifier.alpha(0.7f) else Modifier)
     ) {
         Row(
             modifier = Modifier
@@ -801,24 +826,35 @@ private fun MenuCard(
         ) {
             Box(
                 modifier = Modifier
-                    .size(52.dp)
-                    .clip(RoundedCornerShape(18.dp))
-                    .background(iconTint.copy(alpha = 0.10f)),
+                    .size(48.dp)
+                    .clip(CircleShape)
+                    .background(if (isLocked) Color(0xFFF1F1F1) else iconTint.copy(alpha = 0.12f)),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(icon, contentDescription = title, tint = iconTint, modifier = Modifier.size(28.dp))
+                Icon(
+                    if (isLocked) Icons.Default.Security else icon, 
+                    contentDescription = null, 
+                    tint = if (isLocked) Color.LightGray else iconTint,
+                    modifier = Modifier.size(24.dp)
+                )
             }
 
             Spacer(Modifier.width(16.dp))
 
             Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = title,
-                    color = if (destructive) Color(0xFFE53935) else TextDark,
-                    style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.ExtraBold
-                )
-                Spacer(Modifier.height(4.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = title,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = if (destructive) Color(0xFFE53935) else TextDark
+                    )
+                    if (isLocked) {
+                        Spacer(Modifier.width(8.dp))
+                        Text("🔒", fontSize = 14.sp)
+                    }
+                }
+                Spacer(Modifier.height(2.dp))
                 Text(
                     text = subtitle,
                     color = TextGray,

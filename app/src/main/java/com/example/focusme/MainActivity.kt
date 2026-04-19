@@ -39,6 +39,8 @@ import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Build
 import androidx.core.content.ContextCompat
+import com.example.focusme.data.local.TokenStore
+import com.example.focusme.presentation.ui.components.RestrictedAccessDialog
 
 class MainActivity : ComponentActivity() {
     private val requestNotifPermission =
@@ -51,29 +53,24 @@ class MainActivity : ComponentActivity() {
                 this,
                 Manifest.permission.POST_NOTIFICATIONS
             ) == PackageManager.PERMISSION_GRANTED
-
             if (!granted) {
                 requestNotifPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
             }
         }
         setContent {
             StudyFocusTheme {
-
                 val launcher = rememberLauncherForActivityResult(
                     contract = ActivityResultContracts.RequestPermission(),
                     onResult = { /* nothing */ }
                 )
-
                 LaunchedEffect(Unit) {
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                         launcher.launch(Manifest.permission.POST_NOTIFICATIONS)
                     }
                 }
-
                 AppRoot()
             }
         }
-
     }
 }
 
@@ -83,6 +80,10 @@ private fun AppRoot() {
     val context = LocalContext.current
     val playback by MusicPlaybackManager.state.collectAsState()
     var showMusicBar by remember { mutableStateOf(true) }
+    
+    val tokenStore = remember { TokenStore(context) }
+    val session by tokenStore.observeSession().collectAsState(initial = tokenStore.getSessionBlocking())
+    var showRestrictedDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(playback.currentTrack?.trackId) {
         if (playback.currentTrack != null) {
@@ -100,6 +101,7 @@ private fun AppRoot() {
 
     LaunchedEffect(Unit) {
         MusicPlaybackManager.initialize(context)
+        com.example.focusme.presentation.screen.focus.FocusTimerManager.initialize(context)
     }
 
     val navBackStackEntry = navController.currentBackStackEntryAsState()
@@ -112,11 +114,24 @@ private fun AppRoot() {
         Routes.LOGIN,
         Routes.SIGNUP_CHOICE,
         Routes.SIGNUP,
+        Routes.VERIFY_SIGNUP,
         Routes.FORGOT_PASSWORD,
+        Routes.VERIFY_CODE,
+        Routes.RESET_PASSWORD_CONFIRM,
         Routes.FRIEND_REQUESTS,
         Routes.DIRECT_CHAT
     )
     val showBottomBar = currentRoute !in authRoutes
+
+    if (showRestrictedDialog) {
+        RestrictedAccessDialog(
+            onDismiss = { showRestrictedDialog = false },
+            onSignup = {
+                showRestrictedDialog = false
+                navController.navigate(Routes.SIGNUP_CHOICE)
+            }
+        )
+    }
 
     Scaffold(
         bottomBar = {
@@ -142,6 +157,8 @@ private fun AppRoot() {
                     }
                     NavigationBar {
                         items.forEach { item ->
+                            val restricted = item.route == Routes.FEED || item.route == Routes.CHALLENGES
+                            
                             NavigationBarItem(
                                 selected = if (item.route == Routes.PROFILE) {
                                     isProfileRoute
@@ -151,12 +168,16 @@ private fun AppRoot() {
                                     currentRoute == item.route
                                 },
                                 onClick = {
-                                    navController.navigate(item.route) {
-                                        popUpTo(navController.graph.startDestinationId) {
-                                            saveState = true
+                                    if (restricted && session.isGuest) {
+                                        showRestrictedDialog = true
+                                    } else {
+                                        navController.navigate(item.route) {
+                                            popUpTo(navController.graph.startDestinationId) {
+                                                saveState = true
+                                            }
+                                            launchSingleTop = true
+                                            restoreState = true
                                         }
-                                        launchSingleTop = true
-                                        restoreState = true
                                     }
                                 },
                                 icon = { Icon(item.icon, contentDescription = item.label) },

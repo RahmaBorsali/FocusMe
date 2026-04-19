@@ -19,6 +19,11 @@ class AuthRepository(context: Context) {
             res.message
         }
 
+    suspend fun verifyEmail(email: String, token: String): Result<String> =
+        safeCall {
+            api.verifyEmail(VerifyEmailRequest(email, token))["message"] ?: "Verified."
+        }
+
     suspend fun login(email: String, password: String): Result<UserDto> =
         safeCall {
             val res = api.login(LoginRequest(email, password))
@@ -45,9 +50,9 @@ class AuthRepository(context: Context) {
             api.forgotPassword(ForgotPasswordRequest(email))["message"] ?: "Check your email."
         }
 
-    suspend fun resetPassword(token: String, password: String, confirm: String): Result<String> =
+    suspend fun resetPassword(email: String, token: String, password: String, confirm: String): Result<String> =
         safeCall {
-            api.resetPassword(ResetPasswordRequest(token, password, confirm))["message"] ?: "Password updated."
+            api.resetPassword(ResetPasswordRequest(email, token, password, confirm))["message"] ?: "Password updated."
         }
 
     private suspend fun <T> safeCall(block: suspend () -> T): Result<T> {

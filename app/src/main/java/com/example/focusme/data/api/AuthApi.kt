@@ -11,6 +11,9 @@ interface AuthApi {
     @POST("auth/login")
     suspend fun login(@Body req: LoginRequest): LoginResponse
 
+    @POST("auth/verify-email")
+    suspend fun verifyEmail(@Body req: VerifyEmailRequest): Map<String, String>
+
     @POST("auth/google")
     suspend fun google(@Body req: GoogleAuthRequest): GoogleAuthResponse
 

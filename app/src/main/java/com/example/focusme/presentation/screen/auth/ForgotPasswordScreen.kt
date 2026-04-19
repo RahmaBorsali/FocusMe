@@ -22,6 +22,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.focusme.presentation.ui.components.PrimaryButton
+import com.example.focusme.presentation.ui.components.SweetAlertDialog
+import com.example.focusme.presentation.ui.components.SweetAlertType
 import com.example.focusme.presentation.ui.theme.*
 
 @Composable
@@ -32,6 +34,27 @@ fun ForgotPasswordScreen(
 ) {
     val uiState by vm.ui.collectAsState()
     var email by remember { mutableStateOf("") }
+    var showDialog by remember { mutableStateOf(false) }
+
+    LaunchedEffect(uiState.success) {
+        if (uiState.success != null) {
+            showDialog = true
+        }
+    }
+
+    if (showDialog) {
+        SweetAlertDialog(
+            title = "Email Sent 📧",
+            message = "Check your inbox for the password reset link.",
+            type = SweetAlertType.INFO,
+            confirmButtonText = "OK",
+            onConfirm = {
+                showDialog = false
+                onResetPassword(email.trim())
+            },
+            onDismiss = { showDialog = false }
+        )
+    }
 
     Column(
         modifier = Modifier
@@ -106,7 +129,9 @@ fun ForgotPasswordScreen(
             text = if (uiState.loading) "Envoi..." else "Reset Password",
             onClick = {
                 if (!uiState.loading) {
-                    vm.forgotPassword(email.trim(), onDone = { onResetPassword(email.trim()) })
+                    vm.forgotPassword(email.trim(), onDone = {
+                        // The LaunchedEffect will handle showing the dialog
+                    })
                 }
             },
             modifier = Modifier.fillMaxWidth().height(58.dp)
