@@ -6,6 +6,7 @@ import androidx.room.PrimaryKey
 @Entity(tableName = "study_sessions")
 data class StudySessionEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val userId: String = "",
     val title: String,
     val durationSeconds: Int,
     val tasksCount: Int,

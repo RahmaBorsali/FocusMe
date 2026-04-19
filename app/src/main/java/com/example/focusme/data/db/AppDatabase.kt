@@ -14,7 +14,7 @@ import com.example.focusme.data.local.TaskDao
         TaskEntity::class,
         MusicTrackEntity::class
     ],
-    version = 13,
+    version = 14,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {

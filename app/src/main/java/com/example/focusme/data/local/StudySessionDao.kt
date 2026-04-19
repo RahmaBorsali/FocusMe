@@ -15,9 +15,15 @@ interface StudySessionDao {
     @Query("SELECT * FROM study_sessions ORDER BY createdAtMillis DESC")
     fun observeAll(): Flow<List<StudySessionEntity>>
 
+    @Query("SELECT * FROM study_sessions WHERE userId = :userId ORDER BY createdAtMillis DESC")
+    fun observeByUser(userId: String): Flow<List<StudySessionEntity>>
+
     @Query("DELETE FROM study_sessions WHERE id = :id")
     suspend fun deleteById(id: Long)
 
     @Query("DELETE FROM study_sessions")
     suspend fun deleteAll()
+
+    @Query("DELETE FROM study_sessions WHERE userId = :userId")
+    suspend fun deleteByUser(userId: String)
 }

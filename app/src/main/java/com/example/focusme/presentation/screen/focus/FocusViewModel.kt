@@ -307,7 +307,10 @@ class FocusViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             val s = _uiState.value
 
+            val userId = TokenStore(context).getUserIdBlocking() ?: "local"
+
             val entity = StudySessionEntity(
+                userId = userId,
                 title = title.ifBlank { "Session" },
                 durationSeconds = s.sessionSeconds,
                 tasksCount = s.sessionTasks.size,
@@ -318,7 +321,6 @@ class FocusViewModel(application: Application) : AndroidViewModel(application) {
                 createdAtMillis = System.currentTimeMillis()
             )
 
-            val userId = TokenStore(context).getUserIdBlocking() ?: "local"
             val completedTitles = s.sessionTasks.filter { it.isDone }.map { it.title }
             
             // 1. SAVE LOCALLY FIRST
